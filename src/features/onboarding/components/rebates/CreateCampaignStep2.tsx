@@ -1,0 +1,143 @@
+/* eslint-disable @next/next/no-img-element */
+import { useState } from "react";
+
+interface ProductItem {
+  id: string;
+  name: string;
+  category: string;
+  imageSrc: string;
+}
+
+interface CreateCampaignStep2Props {
+  onBack: () => void;
+  onContinue: (selectedProductIds: string[]) => void;
+  initialSelectedIds: string[];
+}
+
+const selectProductsList: ProductItem[] = [
+  { id: "101", name: "Aura Ceramic Vase", category: "Homeware Collection", imageSrc: "/Auth/rebateImage.svg" },
+  { id: "102", name: "Swift-Step Runner", category: "Performance Gear", imageSrc: "/Auth/rebateImage.svg" },
+  { id: "103", name: "Zenith Wireless Audio", category: "Personal Electronics", imageSrc: "/Auth/rebateImage.svg" },
+  { id: "104", name: "Retro-Scope X1", category: "Photography Assets", imageSrc: "/Auth/rebateImage.svg" },
+  { id: "105", name: "Oracle Sunwear", category: "Fashion Accessories", imageSrc: "/Auth/rebateImage.svg" },
+  { id: "106", name: "Vital Essence Serum", category: "Health & Beauty", imageSrc: "/Auth/rebateImage.svg" },
+  { id: "107", name: "Chronos Smart Wear", category: "Smart Tech", imageSrc: "/Auth/rebateImage.svg" },
+  { id: "108", name: "Verdant Office Suite", category: "Sustainability Line", imageSrc: "/Auth/rebateImage.svg" },
+];
+
+export default function CreateCampaignStep2({ onBack, onContinue, initialSelectedIds }: CreateCampaignStep2Props) {
+  const [selectedIds, setSelectedIds] = useState<string[]>(
+    initialSelectedIds.length > 0 ? initialSelectedIds : ["107"] // default smart wear selected
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const toggleSelect = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter((x) => x !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const filteredProducts = selectProductsList.filter((p) =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="flex flex-col gap-8 w-full animate-slide-up text-left">
+      {/* Stepper indicators header */}
+      <div className="flex justify-between items-center w-full max-w-[800px] mx-auto font-manrope font-semibold border-b border-slate-100 pb-4">
+        {[
+          { step: "1", title: "Basic Info", done: true },
+          { step: "2", title: "Products", active: true },
+          { step: "3", title: "Budget & Offers", active: false },
+          { step: "4", title: "Review & publish", active: false },
+        ].map((s) => (
+          <div key={s.step} className="flex items-center gap-2">
+            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+              s.active ? "bg-[#001BD2] text-white" : s.done ? "bg-[#001BD2]/20 text-[#001BD2]" : "bg-slate-200 text-[#454656]"
+            }`}>{s.done ? "✓" : s.step}</span>
+            <span className={s.active ? "text-[#001BD2] text-xs" : "text-slate-400 text-xs"}>{s.title}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-between items-end w-full">
+        <div>
+          <h2 className="text-3xl font-extrabold font-jakarta text-[#131B2E] tracking-tight">Select Products</h2>
+          <p className="text-xs text-[#64748B] font-medium leading-normal mt-2">
+            Products are used for receipt matching and campaign eligibility
+          </p>
+        </div>
+
+        {/* Search */}
+        <div className="w-[320px] relative">
+          <input
+            type="text"
+            placeholder="Search by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-[42px] bg-white border border-slate-200 rounded-xl pl-10 pr-4 text-xs focus:outline-none focus:border-[#001BD2] text-slate-800 placeholder-[#757688]"
+          />
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center">
+            <img src="/reviews/searchIcon.svg" alt="Search" className="w-[18px] h-[18px] object-contain" />
+          </div>
+        </div>
+      </div>
+
+      {/* Grid List */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full font-manrope">
+        {filteredProducts.map((p) => {
+          const isSelected = selectedIds.includes(p.id);
+          return (
+            <div
+              key={p.id}
+              onClick={() => toggleSelect(p.id)}
+              className={`bg-white border rounded-[20px] p-5 shadow-sm hover:shadow-md transition-all cursor-pointer relative flex flex-col justify-between h-[230px] group ${
+                isSelected ? "border-[#001BD2] ring-2 ring-[#001BD2]/10" : "border-slate-100"
+              }`}
+            >
+              {/* Checkbox overlay */}
+              <div className={`absolute top-4 right-4 w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${
+                isSelected ? "bg-[#001BD2] border-[#001BD2] text-white" : "border-slate-300 bg-white"
+              }`}>
+                {isSelected && <span className="text-[10px] font-bold">✓</span>}
+              </div>
+
+              {/* Product Visual */}
+              <div className="w-full h-[110px] bg-slate-50 rounded-xl overflow-hidden mb-3 flex items-center justify-center">
+                <img src={p.imageSrc} alt={p.name} className="max-h-full max-w-full object-contain" />
+              </div>
+
+              <div className="flex flex-col text-left">
+                <h4 className="text-xs font-bold text-[#131B2E] tracking-tight">{p.name}</h4>
+                <p className="text-[10px] text-[#64748B] font-medium mt-1">{p.category}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Stepper Footer Actions */}
+      <div className="flex justify-between items-center w-full border-t border-slate-100 pt-6 mt-4">
+        <button onClick={onBack} className="text-sm font-bold text-[#757688] hover:text-slate-600 cursor-pointer">
+          ← Back to Details
+        </button>
+        <div className="flex items-center gap-6">
+          <span className="text-xs font-bold text-[#001BD2]">
+            {selectedIds.length} Products selected for campaign
+          </span>
+          <button
+            onClick={() => onContinue(selectedIds)}
+            disabled={selectedIds.length === 0}
+            className={`px-6 h-[46px] bg-[#001BD2] hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-all cursor-pointer ${
+              selectedIds.length === 0 ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            Continue to Budget & Offers →
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
