@@ -10,18 +10,41 @@ interface RewardTier {
   minPurchase: string;
   allocation: number;
 }
+
+interface BudgetOfferDraft {
+  dailyBudget: number;
+  fallback: {
+    rewardAmount: string;
+    isEnabled: boolean;
+    description: string;
+  };
+}
+
 interface Step3Props {
   onBack: () => void;
-  onContinue: () => void;
+  onContinue: (draft: BudgetOfferDraft) => void;
   tiers: RewardTier[];
   onAddCustomTierClick: () => void;
 }
 export default function CreateCampaignStep3({ onBack, onContinue, tiers, onAddCustomTierClick }: Step3Props) {
   const [budget, setBudget] = useState("150");
   const [fallbackActive, setFallbackActive] = useState(true);
+  const [fallbackReward, setFallbackReward] = useState("2.00");
+  const [fallbackDescription, setFallbackDescription] = useState("Fallback offer for receipts that do not meet a tier.");
   const showWarning = Number(budget) > 100;
-  const daysRemaining = showWarning ? Math.floor(2450 / Number(budget)) : 0;
+  const daysRemaining = showWarning && Number(budget) > 0 ? Math.floor(2450 / Number(budget)) : 0;
   const totalAlloc = tiers.reduce((acc, t) => acc + t.allocation, 0);
+  const handleContinue = () => {
+    onContinue({
+      dailyBudget: Number(budget) > 0 ? Number(budget) : 1,
+      fallback: {
+        rewardAmount: Number(fallbackReward) > 0 ? Number(fallbackReward).toFixed(2) : "1.00",
+        isEnabled: fallbackActive,
+        description: fallbackDescription,
+      },
+    });
+  };
+
   return (
     <div className="flex flex-col gap-8 w-full animate-slide-up text-left font-manrope">
       {/* Stepper indications */}
@@ -90,17 +113,23 @@ export default function CreateCampaignStep3({ onBack, onContinue, tiers, onAddCu
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-[#454656] uppercase tracking-wider">REWARD</label>
-                  <input type="text" defaultValue="$2.00 Off" className="w-full h-10 bg-[#FAF8FF] border border-[#C5C5D9]/25 rounded-xl px-4 text-xs font-bold text-[#131B2E]" />
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={fallbackReward}
+                    onChange={(e) => setFallbackReward(e.target.value)}
+                    className="w-full h-10 bg-[#FAF8FF] border border-[#C5C5D9]/25 rounded-xl px-4 text-xs font-bold text-[#131B2E]"
+                  />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#454656] uppercase tracking-wider">MAX PAYOUT</label>
-                    <input type="text" defaultValue="$2.00" className="w-full h-10 bg-[#FAF8FF] border border-[#C5C5D9]/25 rounded-xl px-4 text-xs font-bold text-[#131B2E]" />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-[#454656] uppercase tracking-wider">MIN PURCHASE</label>
-                    <input type="text" defaultValue="$10.00" className="w-full h-10 bg-[#FAF8FF] border border-[#C5C5D9]/25 rounded-xl px-4 text-xs font-bold text-[#131B2E]" />
-                  </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-bold text-[#454656] uppercase tracking-wider">DESCRIPTION</label>
+                  <input
+                    type="text"
+                    value={fallbackDescription}
+                    onChange={(e) => setFallbackDescription(e.target.value)}
+                    className="w-full h-10 bg-[#FAF8FF] border border-[#C5C5D9]/25 rounded-xl px-4 text-xs font-bold text-[#131B2E]"
+                  />
                 </div>
               </div>
             )}
@@ -172,7 +201,7 @@ export default function CreateCampaignStep3({ onBack, onContinue, tiers, onAddCu
       {/* Footer */}
       <div className="flex justify-between items-center w-full border-t border-slate-100 pt-6 mt-4">
         <button onClick={onBack} className="text-sm font-bold text-[#757688] hover:text-slate-600 cursor-pointer">← Back to Products</button>
-        <button onClick={onContinue} className="px-6 h-[46px] bg-[#001BD2] hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2">
+        <button onClick={handleContinue} className="px-6 h-[46px] bg-[#001BD2] hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2">
           <span>Continue to Review</span>
           <img src="/Rebate/continueToReviewIcon.svg" alt="Review" className="w-[14px] h-[14px] object-contain invert" />
         </button>

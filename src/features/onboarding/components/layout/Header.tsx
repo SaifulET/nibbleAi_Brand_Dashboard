@@ -15,9 +15,21 @@ interface HeaderProps {
   notifications: NotificationItem[];
   handleMarkAllRead: () => void;
   onToggleSidebar?: () => void;
+  walletBalance?: string;
+  userName?: string;
+  userRole?: string;
+  avatarUrl?: string;
 }
 
-export default function Header({ notifications, handleMarkAllRead, onToggleSidebar }: HeaderProps) {
+export default function Header({
+  notifications,
+  handleMarkAllRead,
+  onToggleSidebar,
+  walletBalance = "$2,450.00",
+  userName = "Brand user",
+  userRole = "brand",
+  avatarUrl,
+}: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false);
 
   return (
@@ -65,7 +77,7 @@ export default function Header({ notifications, handleMarkAllRead, onToggleSideb
             Balance
           </span>
           <span className="text-sm font-extrabold text-[#131B2E] leading-none mt-0.5">
-            $2,450.00
+            {walletBalance}
           </span>
         </div>
 
@@ -76,16 +88,16 @@ export default function Header({ notifications, handleMarkAllRead, onToggleSideb
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end font-manrope">
             <span className="text-xs font-bold text-[#131B2E] leading-none">
-              Alex Sterling
+              {userName}
             </span>
             <span className="text-[10px] text-[#454656] mt-0.5 font-medium">
-              Admin
+              {userRole}
             </span>
           </div>
           <div className="w-10 h-10 rounded-full border-2 border-[#E2E7FF] overflow-hidden flex items-center justify-center bg-white shadow-sm flex-shrink-0">
             <img
-              src="/Notification/profile1.svg"
-              alt="Admin User Avatar"
+              src={avatarUrl || "/Notification/profile1.svg"}
+              alt="User avatar"
               className="w-full h-full object-cover"
             />
           </div>

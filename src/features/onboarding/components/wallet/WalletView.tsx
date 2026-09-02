@@ -3,7 +3,6 @@
 import { useState } from "react";
 import WalletOverview from "./WalletOverview";
 import WalletDetails from "./WalletDetails";
-import { CreditCard, Bell } from "lucide-react";
 
 export default function WalletView() {
   const [viewModeSetting, setViewModeSetting] = useState<"overview" | "details">("overview");

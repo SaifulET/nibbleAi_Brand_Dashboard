@@ -1,5 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
-import Link from "next/link";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
 
 interface SidebarProps {
   activeTab: string;
@@ -7,6 +10,7 @@ interface SidebarProps {
   setViewMode: (mode: "list" | "add" | "details") => void;
   sidebarOpen?: boolean;
   setSidebarOpen?: (open: boolean) => void;
+  hasBrandAccess?: boolean;
 }
 
 const menuItems = [
@@ -21,7 +25,17 @@ const menuItems = [
   { name: "Settings", icon: "/sidebarIcon/settings.svg" },
 ];
 
-export default function Sidebar({ activeTab, setActiveTab, setViewMode, sidebarOpen, setSidebarOpen }: SidebarProps) {
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  setViewMode,
+  sidebarOpen,
+  setSidebarOpen,
+  hasBrandAccess = true,
+}: SidebarProps) {
+  const router = useRouter();
+  const logout = useBrandApiStore((state) => state.logout);
+
   return (
     <>
       {/* Mobile Drawer Overlay */}
@@ -49,14 +63,21 @@ export default function Sidebar({ activeTab, setActiveTab, setViewMode, sidebarO
         <nav className="flex flex-col gap-1 w-full font-manrope">
           {menuItems.map((item) => {
             const isActive = activeTab === item.name;
+            const isLocked = !hasBrandAccess && !["Dashboard", "Settings"].includes(item.name);
             return (
               <button
                 key={item.name}
                 onClick={() => {
+                  if (isLocked) return;
                   setActiveTab(item.name);
                   setViewMode("list");
                 }}
-                className={`flex items-center gap-3 px-4 py-3 rounded-r-none rounded-l-xl transition-all duration-150 border-r-4 text-sm font-semibold cursor-pointer ${
+                disabled={isLocked}
+                className={`flex items-center gap-3 px-4 py-3 rounded-r-none rounded-l-xl transition-all duration-150 border-r-4 text-sm font-semibold ${
+                  isLocked
+                    ? "cursor-not-allowed border-transparent text-[#757688] opacity-45"
+                    : "cursor-pointer"
+                } ${
                   isActive
                     ? "bg-[#E2E7FF]/50 border-[#001BD2] text-[#001BD2]"
                     : "border-transparent text-[#454656] hover:bg-[#E2E7FF]/20"
@@ -81,8 +102,11 @@ export default function Sidebar({ activeTab, setActiveTab, setViewMode, sidebarO
 
       {/* User Sign Out */}
       <div className="pt-6 border-t border-[#C5C5D9]/15 font-jakarta">
-        <Link
-          href="/login"
+        <button
+          onClick={async () => {
+            await logout();
+            router.push("/login");
+          }}
           className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50 transition-colors rounded-2xl text-sm font-bold text-[#FF2D31]"
         >
           <img
@@ -91,7 +115,7 @@ export default function Sidebar({ activeTab, setActiveTab, setViewMode, sidebarO
             className="w-[18px] h-[18px] object-contain flex-shrink-0"
           />
           <span>SIGN OUT</span>
-        </Link>
+        </button>
       </div>
     </aside>
     </>

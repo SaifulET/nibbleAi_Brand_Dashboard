@@ -16,10 +16,23 @@ interface RewardTier {
   allocation: number;
 }
 
+interface CampaignDraft {
+  name: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  dailyBudget?: number;
+  fallback?: {
+    rewardAmount: string;
+    isEnabled: boolean;
+    description?: string;
+  };
+}
+
 interface CreateCampaignStep4Props {
   onBack: () => void;
   onPublish: () => void;
-  draftData: { name: string; startDate: string; endDate: string; isActive: boolean };
+  draftData: CampaignDraft;
   selectedProducts: ProductItem[];
   tiers: RewardTier[];
 }
@@ -31,6 +44,8 @@ export default function CreateCampaignStep4({
   selectedProducts,
   tiers,
 }: CreateCampaignStep4Props) {
+  const fallbackReward = Number(draftData.fallback?.rewardAmount ?? 2).toFixed(2);
+
   return (
     <div className="flex flex-col justify-center items-start pt-6 md:pt-12 px-4 md:px-12 pb-[142.5px] gap-5 w-full min-h-[1224px] font-manrope text-left mx-auto">
       
@@ -150,7 +165,7 @@ export default function CreateCampaignStep4({
             <div className="p-8 flex flex-col gap-8 h-auto w-full">
               <div className="flex flex-col gap-1 text-left">
                 <span className="text-sm font-semibold text-[#454656] tracking-[0.7px] uppercase font-manrope">DAILY ALLOCATION</span>
-                <span className="text-[36px] font-extrabold text-[#131B2E] leading-none mt-1 font-manrope">$150.00</span>
+                <span className="text-[36px] font-extrabold text-[#131B2E] leading-none mt-1 font-manrope">${Number(draftData.dailyBudget ?? 150).toFixed(2)}</span>
               </div>
               <div className="flex flex-col gap-4">
                 {tiers.filter(t => t.allocation > 0).map((t, idx) => (
@@ -178,19 +193,21 @@ export default function CreateCampaignStep4({
                 </div>
                 <h3 className="font-jakarta font-bold text-lg text-white">Fallback</h3>
               </div>
-              <span className="bg-[#001BD2] text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter">ENABLED</span>
+              <span className="bg-[#001BD2] text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter">
+                {draftData.fallback?.isEnabled ? "ENABLED" : "DISABLED"}
+              </span>
             </div>
 
             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-1 text-left w-full h-[86px]">
               <span className="text-xs text-white/60 font-normal font-manrope">Standard Reward</span>
               <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-2xl font-black text-white font-manrope">$2.00</span>
+                <span className="text-2xl font-black text-white font-manrope">${fallbackReward}</span>
                 <span className="text-sm font-medium text-white/40 font-manrope">Fixed Amount</span>
               </div>
             </div>
 
             <p className="text-xs text-white/50 font-normal leading-[20px] font-manrope italic w-full h-auto">
-              &quot;Fallback offers ensure customer satisfaction when primary tier inventory is depleted.&quot;
+              &quot;{draftData.fallback?.description || "Fallback offers ensure customer satisfaction when primary tier inventory is depleted."}&quot;
             </p>
           </div>
 

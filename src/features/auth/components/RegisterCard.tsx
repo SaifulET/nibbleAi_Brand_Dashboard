@@ -1,12 +1,36 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import StrengthBar from "./StrengthBar";
 import CategoryGrid from "./CategoryGrid";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
 
 export default function RegisterCard() {
+  const router = useRouter();
+  const { registerAndApply, error, status } = useBrandApiStore();
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [website, setWebsite] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [accepted, setAccepted] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!accepted) return;
+    try {
+      await registerAndApply({ fullName, email, password, brandName, website, phone });
+      router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+    } catch {
+      // Store keeps the displayable error.
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-[#FAF8FF] flex items-center justify-center p-4 py-16 md:py-24 font-jakarta">
       {/* Registration Card Wrapper */}
@@ -35,7 +59,7 @@ export default function RegisterCard() {
         </div>
 
         {/* Form Container */}
-        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Row 1: Full Name & Business Phone */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
@@ -43,6 +67,9 @@ export default function RegisterCard() {
               <input
                 type="text"
                 placeholder="John Doe"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                required
                 className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] font-manrope placeholder-slate-400"
               />
             </div>
@@ -51,6 +78,8 @@ export default function RegisterCard() {
               <input
                 type="tel"
                 placeholder="+1 (555) 000-0000"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
                 className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] font-manrope placeholder-slate-400"
               />
             </div>
@@ -62,6 +91,9 @@ export default function RegisterCard() {
             <input
               type="text"
               placeholder="e.g. Acme Corp"
+              value={brandName}
+              onChange={(event) => setBrandName(event.target.value)}
+              required
               className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] font-manrope placeholder-slate-400"
             />
           </div>
@@ -72,6 +104,8 @@ export default function RegisterCard() {
             <input
               type="text"
               placeholder="www.yourbrand.com"
+              value={website}
+              onChange={(event) => setWebsite(event.target.value)}
               className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] font-manrope placeholder-slate-400"
             />
           </div>
@@ -82,6 +116,9 @@ export default function RegisterCard() {
             <input
               type="email"
               placeholder="john@company.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
               className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] font-manrope placeholder-slate-400"
             />
           </div>
@@ -103,6 +140,9 @@ export default function RegisterCard() {
             <input
               type="password"
               placeholder="••••••••••••"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
               className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] font-manrope placeholder-slate-400"
             />
           </div>
@@ -118,6 +158,8 @@ export default function RegisterCard() {
             <input
               type="checkbox"
               id="terms"
+              checked={accepted}
+              onChange={(event) => setAccepted(event.target.checked)}
               className="w-5 h-5 rounded-md border-slate-300 text-[#001BD2] focus:ring-[#001BD2] cursor-pointer"
             />
             <label htmlFor="terms" className="text-[13px] font-medium text-[#454656] cursor-pointer">
@@ -128,12 +170,15 @@ export default function RegisterCard() {
           </div>
 
           {/* Create Account Button */}
-          <Link
-            href="/onboarding"
-            className="flex items-center justify-center w-full h-[60px] rounded-full text-white font-bold text-lg bg-gradient-to-r from-[#001BD2] to-[#2D3FEA] hover:opacity-95 transition-all shadow-lg shadow-blue-600/25 active:scale-[0.98]"
+          {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={!accepted || status === "loading"}
+            className="flex items-center justify-center w-full h-[60px] rounded-full text-white font-bold text-lg bg-gradient-to-r from-[#001BD2] to-[#2D3FEA] hover:opacity-95 transition-all shadow-lg shadow-blue-600/25 active:scale-[0.98] disabled:opacity-60"
           >
-            Create Account
-          </Link>
+            {status === "loading" ? "Creating..." : "Create Account"}
+          </button>
 
           {/* OR Divider */}
           <div className="flex items-center justify-center gap-4 py-1">
@@ -147,14 +192,15 @@ export default function RegisterCard() {
           {/* Google Sign Up Button */}
           <button
             type="button"
-            className="flex items-center justify-center gap-3 w-full h-12 rounded-full border border-[#001BD2]/20 hover:border-[#001BD2]/30 bg-[#E2E7FF] text-[#001BD2] font-bold text-sm transition-all duration-200 cursor-pointer"
+            disabled
+            className="flex items-center justify-center gap-3 w-full h-12 rounded-full border border-slate-200 bg-slate-50 text-[#757688] font-bold text-sm transition-all duration-200 cursor-not-allowed opacity-70"
           >
             <img
               src="/Auth/3rdPageIcons/googleIcon.svg"
               alt="Google icon"
               className="w-5 h-5 object-contain"
             />
-            <span>Sign up with Google</span>
+            <span>Google sign-up unavailable</span>
           </button>
         </form>
 

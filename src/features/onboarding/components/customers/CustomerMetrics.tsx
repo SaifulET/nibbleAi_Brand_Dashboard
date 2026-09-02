@@ -1,20 +1,32 @@
 "use client";
 
-import { Users, Landmark, Award, BarChart3, TrendingUp, ShieldAlert } from "lucide-react";
+import { Users, Landmark, Award, BarChart3, TrendingUp } from "lucide-react";
 
-export default function CustomerMetrics() {
+interface CustomerMetricsProps {
+  totalMembers: number;
+  activePercent: string;
+  totalRewards: string;
+  averageClaims: string;
+}
+
+export default function CustomerMetrics({
+  totalMembers,
+  activePercent,
+  totalRewards,
+  averageClaims,
+}: CustomerMetricsProps) {
   const metrics = [
     {
       title: "Total Members",
-      value: "12,482",
-      subText: "+4.2% from last month",
+      value: totalMembers.toLocaleString("en-US"),
+      subText: "Backend customers",
       isTrend: true,
       icon: <Users className="w-4 h-4 text-emerald-600" />,
       colorClass: "text-emerald-600"
     },
     {
       title: "Active Portfolio",
-      value: "91.8%",
+      value: activePercent,
       subText: "Institutional Grade",
       isTrend: false,
       icon: <Landmark className="w-4 h-4 text-[#454656]" />,
@@ -22,7 +34,7 @@ export default function CustomerMetrics() {
     },
     {
       title: "Total Rewards",
-      value: "$241,093",
+      value: totalRewards,
       subText: "Distributed",
       isTrend: false,
       icon: <Award className="w-4 h-4 text-[#001BD2]" />,
@@ -30,7 +42,7 @@ export default function CustomerMetrics() {
     },
     {
       title: "Average Claims",
-      value: "8.4",
+      value: averageClaims,
       subText: "Per Member",
       isTrend: false,
       icon: <BarChart3 className="w-4 h-4 text-[#006273]" />,

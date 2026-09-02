@@ -1,10 +1,31 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
 
 export default function LoginCard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login, error, status } = useBrandApiStore();
+  const [email, setEmail] = useState(searchParams.get("email") || "");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const verified = searchParams.get("verified") === "1";
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      await login(email.trim(), password, rememberMe);
+      router.replace("/onboarding");
+    } catch {
+      // Store keeps the displayable error.
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-[#FAF8FF] flex items-center justify-center p-4 py-16 md:py-24 font-jakarta">
       {/* Login Card Wrapper */}
@@ -28,18 +49,21 @@ export default function LoginCard() {
             Welcome back
           </h2>
           <p className="text-sm font-medium text-[#454656] leading-relaxed">
-            Access your enterprise dashboard
+            {verified ? "Email verified. Sign in to continue." : "Access your enterprise dashboard"}
           </p>
         </div>
 
         {/* Form Container */}
-        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           {/* Email Address */}
           <div className="flex flex-col gap-1.5 font-manrope">
             <label className="text-xs font-bold text-[#454656]">Email Address</label>
             <input
               type="email"
               placeholder="name@company.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
               className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] placeholder-[#454656]/40"
             />
           </div>
@@ -55,6 +79,9 @@ export default function LoginCard() {
             <input
               type="password"
               placeholder="••••••••"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
               className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] placeholder-[#454656]/40"
             />
           </div>
@@ -64,6 +91,8 @@ export default function LoginCard() {
             <input
               type="checkbox"
               id="remember"
+              checked={rememberMe}
+              onChange={(event) => setRememberMe(event.target.checked)}
               className="w-5 h-5 rounded-md border-slate-300 text-[#001BD2] focus:ring-[#001BD2] cursor-pointer"
             />
             <label htmlFor="remember" className="text-xs font-semibold text-[#454656] cursor-pointer">
@@ -72,12 +101,26 @@ export default function LoginCard() {
           </div>
 
           {/* Sign In Button */}
-          <Link
-            href="/onboarding"
-            className="flex items-center justify-center w-full h-[56px] rounded-full text-white font-bold text-lg bg-gradient-to-r from-[#001BD2] to-[#2D3FEA] hover:opacity-95 transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+          {error && (
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-semibold text-red-600">{error}</p>
+              <p className="text-xs font-medium text-[#454656]">
+                If you just signed up, finish email verification first.
+                {" "}
+                <Link href={`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`} className="font-bold text-[#001BD2] hover:underline">
+                  Verify email
+                </Link>
+              </p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={status === "loading"}
+            className="flex items-center justify-center w-full h-[56px] rounded-full text-white font-bold text-lg bg-gradient-to-r from-[#001BD2] to-[#2D3FEA] hover:opacity-95 transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] disabled:opacity-60"
           >
-            Sign In
-          </Link>
+            {status === "loading" ? "Signing in..." : "Sign In"}
+          </button>
 
           {/* OR Divider */}
           <div className="flex items-center justify-center gap-4 py-1">
@@ -91,14 +134,15 @@ export default function LoginCard() {
           {/* Google Sign In Button */}
           <button
             type="button"
-            className="flex items-center justify-center gap-3 w-full h-14 rounded-full border border-slate-200 hover:bg-slate-50 text-[#131B2E] font-bold text-sm transition-all duration-200 cursor-pointer"
+            disabled
+            className="flex items-center justify-center gap-3 w-full h-14 rounded-full border border-slate-200 bg-slate-50 text-[#757688] font-bold text-sm transition-all duration-200 cursor-not-allowed opacity-70"
           >
             <img
               src="/Auth/3rdPageIcons/googleIcon.svg"
               alt="Google icon"
               className="w-5 h-5 object-contain"
             />
-            <span>Sign in with Google</span>
+            <span>Google sign-in unavailable</span>
           </button>
         </form>
 

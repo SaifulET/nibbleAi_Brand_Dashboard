@@ -13,7 +13,7 @@ interface Product {
 interface ProductDetailsProps {
   product: Product;
   onBack: () => void;
-  onEditAliases: (prod: Product) => void;
+  onEditAliases: (prod: Product) => void | Promise<void>;
   onDelete: (prodId: string) => void;
 }
 export default function ProductDetailsView({ product, onBack, onEditAliases, onDelete }: ProductDetailsProps) {

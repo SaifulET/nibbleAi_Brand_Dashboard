@@ -1,5 +1,64 @@
 /* eslint-disable @next/next/no-img-element */
+"use client";
+
+import { ApiRecord } from "@/lib/api/backendApi";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatInteger, formatMoney, titleCase, toNumber } from "../../utils/backendMappers";
+
+type DashboardCampaign = {
+  id: string;
+  name: string;
+  type: "REBATE" | "REVIEW";
+  status: string;
+  spend: number;
+  activity: string;
+  activitySub: string;
+  thumbnail: string;
+};
+
+const campaignId = (campaign: ApiRecord) =>
+  String(campaign.id ?? campaign.campaign_id ?? "");
+
+const statusText = (status: unknown) => titleCase(status || "draft");
+
 export default function CampaignsTable() {
+  const campaigns = useBrandApiStore((state) => state.campaigns);
+  const reviewCampaigns = useBrandApiStore((state) => state.reviewCampaigns);
+  const analyticsCampaigns = useBrandApiStore((state) => state.analyticsCampaigns);
+  const analyticsByCampaign = new Map(
+    analyticsCampaigns.map((row) => [String(row.campaign_id), row])
+  );
+  const rows: DashboardCampaign[] = [
+    ...campaigns.map((campaign) => {
+      const metrics = analyticsByCampaign.get(campaignId(campaign));
+      const redemptions = toNumber(metrics?.redemptions);
+      const approvals = toNumber(metrics?.approvals);
+      return {
+        id: campaignId(campaign),
+        name: String(campaign.name ?? "Untitled rebate campaign"),
+        type: "REBATE" as const,
+        status: statusText(campaign.status),
+        spend: toNumber(metrics?.total_spend),
+        activity: `${formatInteger(approvals)} Purchases`,
+        activitySub: `${formatInteger(redemptions)} Redemptions`,
+        thumbnail: "/Auth/rebateImage.svg",
+      };
+    }),
+    ...reviewCampaigns.map((campaign) => ({
+      id: campaignId(campaign),
+      name: String(campaign.name ?? "Untitled review campaign"),
+      type: "REVIEW" as const,
+      status: statusText(campaign.status),
+      spend: toNumber(campaign.daily_budget),
+      activity: `${formatInteger(campaign.prompts instanceof Array ? campaign.prompts.length : 0)} Prompts`,
+      activitySub: `${formatMoney(campaign.reward_amount)} Reward`,
+      thumbnail: "/Auth/reviewImage.svg",
+    })),
+  ].filter((campaign) => campaign.id);
+  const activeRows = rows
+    .filter((campaign) => campaign.status.toLowerCase() === "active")
+    .slice(0, 5);
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex justify-between items-center w-full">
@@ -33,180 +92,71 @@ export default function CampaignsTable() {
             </tr>
           </thead>
           <tbody>
-            {/* Row 1 */}
-            <tr className="h-[88.5px] border-b border-[#C5C5D9]/5 hover:bg-slate-50/50 transition-colors">
-              <td className="px-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#EAEDFF] overflow-hidden flex items-center justify-center flex-shrink-0">
-                    <img
-                      src="/Auth/rebateImage.svg"
-                      alt="Campaign thumbnail"
-                      className="w-10 h-10 object-cover"
-                    />
+            {activeRows.map((row) => (
+              <tr key={`${row.type}-${row.id}`} className="h-[88.5px] border-b border-[#C5C5D9]/5 hover:bg-slate-50/50 transition-colors">
+                <td className="px-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-[#EAEDFF] overflow-hidden flex items-center justify-center flex-shrink-0">
+                      <img
+                        src={row.thumbnail}
+                        alt="Campaign thumbnail"
+                        className="w-10 h-10 object-cover"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold text-[#131B2E]">
+                        {row.name}
+                      </span>
+                      <span className="text-[10px] text-[#454656] mt-0.5">
+                        ID: {row.id.slice(0, 8)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
+                </td>
+                <td className="px-8">
+                  <span className={`${row.type === "REBATE" ? "bg-[#001BD2]/10 text-[#001BD2]" : "bg-[#004956]/10 text-[#004956]"} text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tight`}>
+                    {row.type}
+                  </span>
+                </td>
+                <td className="px-8">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 ${row.status === "Active" ? "bg-[#10B981]" : "bg-[#FBBF24]"} rounded-full`}></span>
+                    <span className="text-xs font-semibold text-[#454656]">
+                      {row.status}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-8 text-right">
+                  <span className="text-sm font-bold text-[#131B2E]">
+                    {formatMoney(row.spend)}
+                  </span>
+                </td>
+                <td className="px-8 text-right">
+                  <div className="flex flex-col items-end">
                     <span className="text-sm font-bold text-[#131B2E]">
-                      Spring Runner 500 Launch
+                      {row.activity}
                     </span>
                     <span className="text-[10px] text-[#454656] mt-0.5">
-                      ID: #REB-004521
+                      {row.activitySub}
                     </span>
                   </div>
-                </div>
-              </td>
-              <td className="px-8">
-                <span className="bg-[#001BD2]/10 text-[#001BD2] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tight">
-                  REBATE
-                </span>
-              </td>
-              <td className="px-8">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-[#10B981] rounded-full"></span>
-                  <span className="text-xs font-semibold text-[#454656]">
-                    Active
-                  </span>
-                </div>
-              </td>
-              <td className="px-8 text-right">
-                <div className="flex flex-col items-end">
-                  <span className="text-sm font-bold text-[#131B2E]">
-                    $4,500.00
-                  </span>
-                  <span className="text-[10px] text-[#454656] mt-0.5">
-                    Remaining: $1.2k
-                  </span>
-                </div>
-              </td>
-              <td className="px-8 text-right">
-                <div className="flex flex-col items-end">
-                  <span className="text-sm font-bold text-[#131B2E]">
-                    342 Purchases
-                  </span>
-                  <span className="text-[10px] text-[#059669] font-bold mt-0.5">
-                    92% Claim Rate
-                  </span>
-                </div>
-              </td>
-            </tr>
-
-            {/* Row 2 */}
-            <tr className="h-[88.5px] border-b border-[#C5C5D9]/5 hover:bg-slate-50/50 transition-colors">
-              <td className="px-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#EAEDFF] overflow-hidden flex items-center justify-center flex-shrink-0">
-                    <img
-                      src="/Auth/reviewImage.svg"
-                      alt="Campaign thumbnail"
-                      className="w-10 h-10 object-cover"
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-[#131B2E]">
-                      Elite Chrono Review Blitz
-                    </span>
-                    <span className="text-[10px] text-[#454656] mt-0.5">
-                      ID: #REV-009923
-                    </span>
-                  </div>
-                </div>
-              </td>
-              <td className="px-8">
-                <span className="bg-[#004956]/10 text-[#004956] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tight">
-                  REVIEW
-                </span>
-              </td>
-              <td className="px-8">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-[#10B981] rounded-full"></span>
-                  <span className="text-xs font-semibold text-[#454656]">
-                    Active
-                  </span>
-                </div>
-              </td>
-              <td className="px-8 text-right">
-                <div className="flex flex-col items-end">
-                  <span className="text-sm font-bold text-[#131B2E]">
-                    $1,200.00
-                  </span>
-                  <span className="text-[10px] text-[#454656] mt-0.5">
-                    Remaining: $800
-                  </span>
-                </div>
-              </td>
-              <td className="px-8 text-right">
-                <div className="flex flex-col items-end">
-                  <span className="text-sm font-bold text-[#131B2E]">
-                    84 Reviews
-                  </span>
-                  <span className="text-[10px] text-[#454656] mt-0.5">
-                    4.8 Avg Rating
-                  </span>
-                </div>
-              </td>
-            </tr>
-
-            {/* Row 3 */}
-            <tr className="h-[88.5px] hover:bg-slate-50/50 transition-colors">
-              <td className="px-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-[#EAEDFF] overflow-hidden flex items-center justify-center flex-shrink-0">
-                    <img
-                      src="/Auth/rebateImage.svg"
-                      alt="Campaign thumbnail"
-                      className="w-10 h-10 object-cover"
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-[#131B2E]">
-                      Summer Shades Discount
-                    </span>
-                    <span className="text-[10px] text-[#454656] mt-0.5">
-                      ID: #REB-004812
-                    </span>
-                  </div>
-                </div>
-              </td>
-              <td className="px-8">
-                <span className="bg-[#001BD2]/10 text-[#001BD2] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-tight">
-                  REBATE
-                </span>
-              </td>
-              <td className="px-8">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-[#FBBF24] rounded-full"></span>
-                  <span className="text-xs font-semibold text-[#454656]">
-                    Paused
-                  </span>
-                </div>
-              </td>
-              <td className="px-8 text-right">
-                <div className="flex flex-col items-end">
-                  <span className="text-sm font-bold text-[#131B2E]">
-                    $850.00
-                  </span>
-                  <span className="text-[10px] text-[#454656] mt-0.5">
-                    Budget Capped
-                  </span>
-                </div>
-              </td>
-              <td className="px-8 text-right">
-                <div className="flex flex-col items-end">
-                  <span className="text-sm font-bold text-[#131B2E]">
-                    56 Purchases
-                  </span>
-                  <span className="text-[10px] text-[#454656] mt-0.5">
-                    100% Fulfilled
-                  </span>
-                </div>
-              </td>
-            </tr>
+                </td>
+              </tr>
+            ))}
+            {activeRows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-8 py-12 text-center text-sm font-semibold text-slate-400">
+                  No active campaigns yet.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
 
         {/* Table Footer */}
         <div className="flex justify-between items-center px-8 py-4 bg-[#F2F3FF] border-t border-[#C5C5D9]/5">
           <span className="text-[10px] font-manrope font-bold text-[#454656] tracking-wider uppercase">
-            SHOWING 3 OF 12 ACTIVE CAMPAIGNS
+            SHOWING {activeRows.length} OF {rows.length} CAMPAIGNS
           </span>
           <button className="font-manrope font-bold text-xs text-[#001BD2] hover:underline cursor-pointer">
             See All Activity

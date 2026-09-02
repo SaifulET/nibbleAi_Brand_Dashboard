@@ -90,7 +90,7 @@ export default function CustomerProfileView({ customer, onBack, onToggleSuspend 
             <div className="flex gap-1"><Star className="w-4 h-4 fill-[#FBBF24] text-[#FBBF24]" /></div>
             <h4 className="font-bold text-sm text-[#131B2E] uppercase tracking-wider">Top Rated Review</h4>
             <p className="text-sm leading-6 text-[#454656] italic">
-              "The electronics cashback tier is absolutely the best in the industry. Quick approval times..."
+              &quot;The electronics cashback tier is absolutely the best in the industry. Quick approval times...&quot;
             </p>
           </div>
 

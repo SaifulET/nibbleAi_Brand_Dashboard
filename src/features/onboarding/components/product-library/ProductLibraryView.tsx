@@ -14,8 +14,8 @@ interface Product {
 
 interface ProductLibraryViewProps {
   products: Product[];
-  onViewDetails: (prod: Product) => void;
-  onEditAliases: (prod: Product) => void;
+  onViewDetails: (prod: Product) => void | Promise<void>;
+  onEditAliases: (prod: Product) => void | Promise<void>;
   onAddNew: () => void;
 }
 
@@ -25,6 +25,8 @@ export default function ProductLibraryView({
   onEditAliases,
   onAddNew,
 }: ProductLibraryViewProps) {
+  const activeCategories = new Set(products.map((product) => product.category).filter(Boolean)).size;
+
   return (
     <div className="flex flex-col gap-8 w-full animate-slide-up">
       {/* Header Title */}
@@ -41,7 +43,7 @@ export default function ProductLibraryView({
             Total SKUs
           </span>
           <span className="text-[30px] font-extrabold text-[#131B2E] mt-2">
-            {1279 + products.length}
+            {products.length}
           </span>
         </div>
         <div className="bg-white border border-[#C5C5D9]/10 rounded-2xl p-6 shadow-sm flex flex-col font-jakarta">
@@ -49,7 +51,7 @@ export default function ProductLibraryView({
             Active Categories
           </span>
           <span className="text-[30px] font-extrabold text-[#131B2E] mt-2">
-            12
+            {activeCategories}
           </span>
         </div>
         <div className="bg-white border border-[#C5C5D9]/10 rounded-2xl p-6 shadow-sm flex flex-col font-jakarta">
@@ -57,7 +59,7 @@ export default function ProductLibraryView({
             Out of Stock
           </span>
           <span className="text-[30px] font-extrabold text-[#DC2626] mt-2">
-            42
+            0
           </span>
         </div>
       </div>
@@ -95,7 +97,7 @@ export default function ProductLibraryView({
       {/* Pagination footer */}
       <div className="flex justify-between items-center px-4 py-4 bg-[#F2F3FF] border-t border-[#C5C5D9]/5 rounded-xl font-manrope mt-4">
         <span className="text-xs font-semibold text-[#454656]">
-          Showing 1 - {products.length} of {1279 + products.length} products
+          Showing 1 - {products.length} of {products.length} products
         </span>
         <div className="flex items-center gap-1">
           <button className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-xs text-slate-500 hover:bg-slate-50">

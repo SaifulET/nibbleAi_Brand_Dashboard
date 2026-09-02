@@ -12,7 +12,7 @@ interface AddProductViewProps {
     format: string;
     size: string;
     aliases: string[];
-  }) => void;
+  }) => void | Promise<void>;
 }
 
 export default function AddProductView({ onCancel, onSave }: AddProductViewProps) {
@@ -43,9 +43,9 @@ export default function AddProductView({ onCancel, onSave }: AddProductViewProps
     setAliases(aliases.filter((a) => a !== alias));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name) return;
-    onSave({ name, description, brand, category, flavor, format, size, aliases });
+    await onSave({ name, description, brand, category, flavor, format, size, aliases });
   };
 
   return (

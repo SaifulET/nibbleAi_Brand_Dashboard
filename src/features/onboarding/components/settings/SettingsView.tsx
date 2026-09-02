@@ -6,13 +6,21 @@ import TeamTab from "./TeamTab";
 import SecurityTab from "./SecurityTab";
 import InviteUserModal from "./InviteUserModal";
 import { Search } from "lucide-react";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
 
 export default function SettingsView() {
   const [activeTabSetting, setActiveTabSetting] = useState<"Brand Profile" | "Team" | "Security">("Brand Profile");
   const [showInvite, setShowInvite] = useState(false);
+  const [message, setMessage] = useState("");
+  const inviteMember = useBrandApiStore((state) => state.inviteMember);
 
-  const handleSendInvite = (email: string, role: string) => {
-    alert(`Invitation sent to ${email} for role: ${role}`);
+  const handleSendInvite = async (email: string, role: string) => {
+    try {
+      await inviteMember(email, role);
+      setMessage(`Invitation sent to ${email}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not invite member.");
+    }
   };
 
   return (
@@ -36,10 +44,11 @@ export default function SettingsView() {
           </div>
         </div>
 
-        {/* Right header save button */}
-        <button className="bg-gradient-to-r from-[#001BD2] to-[#2D3FEA] hover:opacity-95 text-white font-extrabold text-sm px-8 py-2.5 rounded-full border-none cursor-pointer shadow-[0px_10px_15px_-3px_rgba(0,27,210,0.2)]">
-          Save Changes
-        </button>
+        {message && (
+          <span className="bg-[#E2E7FF] text-[#001BD2] font-bold text-xs px-4 py-2 rounded-full">
+            {message}
+          </span>
+        )}
       </div>
 
       {/* Settings Navigation Tabs Switcher */}

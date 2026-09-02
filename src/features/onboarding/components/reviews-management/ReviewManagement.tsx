@@ -3,6 +3,9 @@
 import { useState } from "react";
 import ReviewKpiCard from "./ReviewKpiCard";
 import ReviewRow from "./ReviewRow";
+import { ApiRecord } from "@/lib/api/backendApi";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatMoney, toNumber } from "../../utils/backendMappers";
 
 interface ReviewItem {
   id: string;
@@ -21,52 +24,42 @@ interface ReviewManagementProps {
   onBack: () => void;
 }
 
-const initialReviews: ReviewItem[] = [
-  {
-    id: "r1",
-    customerName: "Elena Rodriguez",
-    customerEmail: "elena.r@example.com",
-    customerAvatar: "/Notification/profile1.svg",
-    productName: "Hydro-Glow Serum",
-    date: "Oct 24, 2023",
-    rating: 5,
-    reward: "$2.50",
-    status: "Approved",
-    reviewText: "Nibbl's Hydro-Glow Serum really delivered. Rich and hydrating, it completely rejuvenated my skin texture.",
-  },
-  {
-    id: "r2",
-    customerName: "Marcus Chen",
-    customerEmail: "marcus.c@nibbl.io",
-    customerAvatar: "/Notification/profile1.svg",
-    productName: "Zen Mode No-Caf",
-    date: "Oct 22, 2023",
-    rating: 4,
-    reward: "$2.50",
-    status: "Pending Approval",
-    reviewText: "I'm usually skeptical of decaf options, but Nibbl's Zen Mode No-Caf really delivered. It has a rich, bold flavor profile that mirrors high-quality arabica beans without any of the jitteriness.",
-  },
-  {
-    id: "r3",
-    customerName: "Jordan Banks",
-    customerEmail: "jordan.b@web.com",
-    customerAvatar: "",
-    productName: "Smart Scale V2",
-    date: "Oct 20, 2023",
-    rating: 5,
-    reward: "$2.50",
-    status: "Approved",
-    reviewText: "The smart scale connects instantly to my phone. Clean build quality, accurate tracking, and a very premium aesthetic.",
-  },
-];
+const mapReview = (review: ApiRecord): ReviewItem => ({
+  id: String(review.id),
+  customerName: String(review.user_email ?? "Customer"),
+  customerEmail: String(review.user_email ?? ""),
+  customerAvatar: "",
+  productName: String(review.product_name ?? "Product"),
+  date:
+    typeof review.created_at === "string"
+      ? new Date(review.created_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "",
+  rating: toNumber(review.rating),
+  reward: "$0.00",
+  status: String(review.status).toLowerCase() === "held" ? "Pending Approval" : "Approved",
+  reviewText: String(review.content ?? ""),
+});
 
 export default function ReviewManagement({ onBack }: ReviewManagementProps) {
   const [activeTab, setActiveTab] = useState<"All" | "Pending">("All");
-  const [reviews, setReviews] = useState<ReviewItem[]>(initialReviews);
-  const [expandedId, setExpandedId] = useState<string | null>("r2"); // default expanded marcus
+  const apiReviews = useBrandApiStore((state) => state.reviews);
+  const analyticsOverview = useBrandApiStore((state) => state.analyticsOverview);
+  const spend = (analyticsOverview?.spend || {}) as Record<string, unknown>;
+  const totalReviews = toNumber(analyticsOverview?.reviews);
+  const reviewSpend = toNumber(spend.review_reward) + toNumber(spend.review_fee);
+  const [localStatuses, setLocalStatuses] = useState<Record<string, ReviewItem["status"]>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const reviews = apiReviews.map((review) => {
+    const mapped = mapReview(review);
+    return { ...mapped, status: localStatuses[mapped.id] || mapped.status };
+  });
 
   const handleApprove = (id: string) => {
-    setReviews(prev => prev.map(r => r.id === id ? { ...r, status: "Approved" } : r));
+    setLocalStatuses((prev) => ({ ...prev, [id]: "Approved" }));
     setExpandedId(null);
   };
 
@@ -110,10 +103,10 @@ export default function ReviewManagement({ onBack }: ReviewManagementProps) {
 
       {/* KPI Cards Bento Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full mt-2">
-        <ReviewKpiCard title="Total Reviews" value="24,892" badgeText="+12.5%" badgeType="green" iconPath="/reviews/TotalReviews.svg" iconBgColor="bg-[#001BD2]/5 text-[#001BD2]" />
-        <ReviewKpiCard title="Review Spend" value="$62,230" badgeText="Lifetime" badgeType="gray" iconPath="/reviews/ReviewSpend.svg" iconBgColor="bg-[#004956]/5 text-[#004956]" />
-        <ReviewKpiCard title="Cost per Review" value="$2.50" badgeText="Average" badgeType="gray" iconPath="/reviews/CostperReview.svg" iconBgColor="bg-[#505F76]/5 text-[#505F76]" />
-        <ReviewKpiCard title="Reviews per Product" value="42.5" badgeText="Average per SKU" badgeType="gray" iconPath="/reviews/TotalReviews.svg" iconBgColor="bg-[#001BD2]/5 text-[#001BD2]" />
+        <ReviewKpiCard title="Total Reviews" value={String(totalReviews)} badgeText="Backend" badgeType="green" iconPath="/reviews/TotalReviews.svg" iconBgColor="bg-[#001BD2]/5 text-[#001BD2]" />
+        <ReviewKpiCard title="Review Spend" value={formatMoney(reviewSpend)} badgeText="Lifetime" badgeType="gray" iconPath="/reviews/ReviewSpend.svg" iconBgColor="bg-[#004956]/5 text-[#004956]" />
+        <ReviewKpiCard title="Cost per Review" value={formatMoney(totalReviews ? reviewSpend / totalReviews : 0)} badgeText="Average" badgeType="gray" iconPath="/reviews/CostperReview.svg" iconBgColor="bg-[#505F76]/5 text-[#505F76]" />
+        <ReviewKpiCard title="Reviews per Product" value={String(reviews.length)} badgeText="Visible" badgeType="gray" iconPath="/reviews/TotalReviews.svg" iconBgColor="bg-[#001BD2]/5 text-[#001BD2]" />
       </div>
 
       {/* Table Section */}
@@ -164,7 +157,7 @@ export default function ReviewManagement({ onBack }: ReviewManagementProps) {
 
         {/* Pagination Footer */}
         <div className="px-8 py-5 border-t border-[#C5C5D9]/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-medium text-[#454656]">
-          <span>Showing 1 to {filtered.length} of 2,482 reviews</span>
+          <span>Showing 1 to {filtered.length} of {reviews.length} reviews</span>
           
           <div className="flex items-center gap-2">
             <button className="w-8 h-8 rounded-lg border border-[#C5C5D9]/20 flex items-center justify-center hover:bg-slate-50 cursor-pointer bg-white text-[#131B2E]">◀</button>

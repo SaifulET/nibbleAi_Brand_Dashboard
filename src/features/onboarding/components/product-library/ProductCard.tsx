@@ -13,8 +13,8 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
-  onViewDetails: (prod: Product) => void;
-  onEditAliases: (prod: Product) => void;
+  onViewDetails: (prod: Product) => void | Promise<void>;
+  onEditAliases: (prod: Product) => void | Promise<void>;
 }
 
 export default function ProductCard({ product, onViewDetails, onEditAliases }: ProductCardProps) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SlidersHorizontal, Download, FileSpreadsheet, ArrowLeftRight } from "lucide-react";
+import { SlidersHorizontal, Download } from "lucide-react";
 
 export interface CustomerData {
   id: string;
@@ -104,7 +104,7 @@ export default function CustomerLedger({ customers, onSelectCustomer, onToggleSu
 
       {/* Pagination Footer */}
       <div className="bg-[#FAF8FF] px-8 py-4 border-t border-[#C5C5D9]/10 flex flex-wrap justify-between items-center gap-4">
-        <span className="text-xs font-semibold text-[#454656]">Showing 1 to {customers.length} of 12,482 members</span>
+        <span className="text-xs font-semibold text-[#454656]">Showing 1 to {customers.length} of {customers.length} members</span>
         <div className="flex items-center gap-1.5">
           <button onClick={() => activePage > 1 && setActivePage(activePage - 1)} className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 border border-slate-200 text-slate-400 cursor-pointer flex items-center justify-center">◀</button>
           {[1, 2, 3].map(page => (

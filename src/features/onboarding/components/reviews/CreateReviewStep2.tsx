@@ -18,28 +18,18 @@ interface CreateReviewStep2Props {
   initialSelectedIds: string[];
   onBack: () => void;
   onContinue: (selectedIds: string[]) => void;
+  products: ProductItem[];
 }
 
-const selectProductsList: ProductItem[] = [
-  { id: "101", name: "Aura Ceramic Vase", category: "Homeware Collection", imageSrc: "/trail_mix.jpg" },
-  { id: "102", name: "Swift-Step Runner", category: "Performance Gear", imageSrc: "/nitro_cold_brew.jpg" },
-  { id: "103", name: "Zenith Wireless Audio", category: "Personal Electronics", imageSrc: "/lime_sparkler.jpg" },
-  { id: "104", name: "Retro-Scope X1", category: "Photography Assets", imageSrc: "/trail_mix.jpg" },
-  { id: "105", name: "Oracle Sunwear", category: "Fashion Accessories", imageSrc: "/nitro_cold_brew.jpg" },
-  { id: "106", name: "Vital Essence Serum", category: "Health & Beauty", imageSrc: "/lime_sparkler.jpg" },
-  { id: "107", name: "Chronos Smart Wear", category: "Smart Tech", imageSrc: "/trail_mix.jpg" },
-  { id: "108", name: "Verdant Office Suite", category: "Sustainability Line", imageSrc: "/nitro_cold_brew.jpg" },
-];
-
-export default function CreateReviewStep2({ initialSelectedIds, onBack, onContinue }: CreateReviewStep2Props) {
-  const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds.length > 0 ? initialSelectedIds : ["107"]);
+export default function CreateReviewStep2({ initialSelectedIds, onBack, onContinue, products }: CreateReviewStep2Props) {
+  const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleToggle = (prodId: string) => {
     setSelectedIds(prev => prev.includes(prodId) ? prev.filter(id => id !== prodId) : [...prev, prodId]);
   };
 
-  const filtered = selectProductsList.filter(p =>
+  const filtered = products.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -73,6 +63,11 @@ export default function CreateReviewStep2({ initialSelectedIds, onBack, onContin
             onToggle={handleToggle}
           />
         ))}
+        {filtered.length === 0 && (
+          <div className="col-span-full bg-white border border-slate-100 rounded-xl p-10 text-center text-sm font-semibold text-slate-400">
+            No products found in the backend product library.
+          </div>
+        )}
       </div>
 
       {/* Footer */}

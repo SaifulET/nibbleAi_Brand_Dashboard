@@ -1,13 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldCheck, Pencil, ArrowUpRight } from "lucide-react";
+import { ShieldCheck, Pencil } from "lucide-react";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
 
 export default function BrandProfileTab() {
-  const [brandName, setBrandName] = useState("Nibbl Inc.");
-  const [category, setCategory] = useState("Fintech & Payments");
-  const [website, setWebsite] = useState("nibbl.io");
-  const [email, setEmail] = useState("support@nibbl.io");
+  const brand = useBrandApiStore((state) => state.brand);
+  const updateBrandProfile = useBrandApiStore((state) => state.updateBrandProfile);
+  const [draft, setDraft] = useState<{
+    brandName?: string;
+    description?: string;
+    website?: string;
+    email?: string;
+  }>({});
+  const [message, setMessage] = useState("");
+  const brandName = draft.brandName ?? String(brand?.legal_name ?? brand?.name ?? "");
+  const description = draft.description ?? String(brand?.description ?? "");
+  const website = draft.website ?? String(brand?.website ?? "").replace(/^https?:\/\//, "");
+  const email = draft.email ?? String(brand?.contact_email ?? "");
+
+  const handleSave = async () => {
+    try {
+      setMessage("");
+      await updateBrandProfile({
+        legal_name: brandName,
+        description,
+        website: website ? `https://${website.replace(/^https?:\/\//, "")}` : "",
+        contact_email: email,
+      });
+      setMessage("Brand profile saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save brand profile.");
+    }
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full text-left font-manrope">
@@ -26,15 +51,11 @@ export default function BrandProfileTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-[#454656] uppercase tracking-wider pl-1">Brand Name</label>
-                <input type="text" value={brandName} onChange={(e) => setBrandName(e.target.value)} className="bg-[#F2F3FF] border-none rounded-2xl px-5 py-3.5 text-sm font-semibold text-[#131B2E] outline-none" />
+                <input type="text" value={brandName} onChange={(e) => setDraft((prev) => ({ ...prev, brandName: e.target.value }))} className="bg-[#F2F3FF] border-none rounded-2xl px-5 py-3.5 text-sm font-semibold text-[#131B2E] outline-none" />
               </div>
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-[#454656] uppercase tracking-wider pl-1">Industry Category</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)} className="bg-[#F2F3FF] border-none rounded-2xl px-5 py-3.5 text-sm font-semibold text-[#131B2E] outline-none cursor-pointer">
-                  <option>Fintech & Payments</option>
-                  <option>E-Commerce & Retail</option>
-                  <option>Food & Beverage</option>
-                </select>
+                <label className="text-xs font-bold text-[#454656] uppercase tracking-wider pl-1">Description</label>
+                <input type="text" value={description} onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))} className="bg-[#F2F3FF] border-none rounded-2xl px-5 py-3.5 text-sm font-semibold text-[#131B2E] outline-none" />
               </div>
             </div>
             
@@ -42,14 +63,20 @@ export default function BrandProfileTab() {
               <label className="text-xs font-bold text-[#454656] uppercase tracking-wider pl-1">Website URL</label>
               <div className="bg-[#F2F3FF] rounded-2xl flex items-center px-5 py-3.5 gap-1.5">
                 <span className="text-sm font-medium text-[#757688]">https://</span>
-                <input type="text" value={website} onChange={(e) => setWebsite(e.target.value)} className="bg-transparent border-none outline-none text-sm font-semibold text-[#131B2E] flex-1" />
+                <input type="text" value={website} onChange={(e) => setDraft((prev) => ({ ...prev, website: e.target.value }))} className="bg-transparent border-none outline-none text-sm font-semibold text-[#131B2E] flex-1" />
               </div>
             </div>
 
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-[#454656] uppercase tracking-wider pl-1">Support Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-[#F2F3FF] border-none rounded-2xl px-5 py-3.5 text-sm font-semibold text-[#131B2E] outline-none" />
+              <input type="email" value={email} onChange={(e) => setDraft((prev) => ({ ...prev, email: e.target.value }))} className="bg-[#F2F3FF] border-none rounded-2xl px-5 py-3.5 text-sm font-semibold text-[#131B2E] outline-none" />
               <span className="text-[10.5px] text-[#454656]/75 mt-0.5 pl-1 leading-none font-medium">This email will be visible to your customers in campaign footers.</span>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              {message && <span className="text-xs font-bold text-[#001BD2]">{message}</span>}
+              <button onClick={handleSave} className="bg-[#001BD2] hover:bg-blue-700 text-white text-sm font-bold px-6 py-2.5 rounded-full">
+                Save Profile
+              </button>
             </div>
           </div>
         </div>
@@ -63,7 +90,7 @@ export default function BrandProfileTab() {
           </div>
           <div className="p-8 flex flex-row items-center gap-8 flex-wrap">
             <div className="relative w-[128px] h-[128px] bg-[#001BD2]/5 border-2 border-dashed border-[#C5C5D9] rounded-[20px] flex items-center justify-center flex-shrink-0">
-              <div className="w-12 h-12 bg-[#001BD2] text-white font-extrabold text-xl rounded-2xl flex items-center justify-center">N</div>
+              <div className="w-12 h-12 bg-[#001BD2] text-white font-extrabold text-xl rounded-2xl flex items-center justify-center">{brandName.charAt(0) || "B"}</div>
               <button className="absolute -right-2 -bottom-2 w-7 h-7 rounded-full bg-white shadow-md border-none flex items-center justify-center cursor-pointer text-[#001BD2]"><Pencil className="w-3.5 h-3.5" /></button>
             </div>
             <div className="flex flex-col gap-4 max-w-[380px]">
@@ -89,7 +116,7 @@ export default function BrandProfileTab() {
           <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full filter blur-xl"></div>
           <div className="flex justify-between items-start z-10 relative">
             <ShieldCheck className="w-6 h-6 text-white/80" />
-            <span className="bg-white/20 px-2.5 py-1 rounded-[8px] text-[10px] font-extrabold tracking-wider uppercase">Verified</span>
+            <span className="bg-white/20 px-2.5 py-1 rounded-[8px] text-[10px] font-extrabold tracking-wider uppercase">{String(brand?.status ?? "Pending")}</span>
           </div>
           <div className="flex flex-col mt-7 text-left z-10 relative">
             <span className="text-xs font-medium text-white/70">Account Standing</span>

@@ -12,22 +12,12 @@ interface CreateCampaignStep2Props {
   onBack: () => void;
   onContinue: (selectedProductIds: string[]) => void;
   initialSelectedIds: string[];
+  products: ProductItem[];
 }
 
-const selectProductsList: ProductItem[] = [
-  { id: "101", name: "Aura Ceramic Vase", category: "Homeware Collection", imageSrc: "/Auth/rebateImage.svg" },
-  { id: "102", name: "Swift-Step Runner", category: "Performance Gear", imageSrc: "/Auth/rebateImage.svg" },
-  { id: "103", name: "Zenith Wireless Audio", category: "Personal Electronics", imageSrc: "/Auth/rebateImage.svg" },
-  { id: "104", name: "Retro-Scope X1", category: "Photography Assets", imageSrc: "/Auth/rebateImage.svg" },
-  { id: "105", name: "Oracle Sunwear", category: "Fashion Accessories", imageSrc: "/Auth/rebateImage.svg" },
-  { id: "106", name: "Vital Essence Serum", category: "Health & Beauty", imageSrc: "/Auth/rebateImage.svg" },
-  { id: "107", name: "Chronos Smart Wear", category: "Smart Tech", imageSrc: "/Auth/rebateImage.svg" },
-  { id: "108", name: "Verdant Office Suite", category: "Sustainability Line", imageSrc: "/Auth/rebateImage.svg" },
-];
-
-export default function CreateCampaignStep2({ onBack, onContinue, initialSelectedIds }: CreateCampaignStep2Props) {
+export default function CreateCampaignStep2({ onBack, onContinue, initialSelectedIds, products }: CreateCampaignStep2Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>(
-    initialSelectedIds.length > 0 ? initialSelectedIds : ["107"] // default smart wear selected
+    initialSelectedIds
   );
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -39,8 +29,9 @@ export default function CreateCampaignStep2({ onBack, onContinue, initialSelecte
     }
   };
 
-  const filteredProducts = selectProductsList.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredProducts = products.filter((p) =>
+    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -116,6 +107,11 @@ export default function CreateCampaignStep2({ onBack, onContinue, initialSelecte
             </div>
           );
         })}
+        {filteredProducts.length === 0 && (
+          <div className="col-span-full bg-white border border-slate-100 rounded-[20px] p-10 text-center text-sm font-semibold text-slate-400">
+            No products found in the backend product library.
+          </div>
+        )}
       </div>
 
       {/* Stepper Footer Actions */}

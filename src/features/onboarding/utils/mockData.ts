@@ -17,6 +17,7 @@ export interface Product {
   format: string;
   size: string;
   aliases: string[];
+  aliasRecords?: { id: string; alias_text: string }[];
   activeCampaigns: number;
 }
 

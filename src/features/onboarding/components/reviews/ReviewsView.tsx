@@ -6,6 +6,9 @@ import CreateReviewStep2 from "./CreateReviewStep2";
 import CreateReviewStep3 from "./CreateReviewStep3";
 import CreateReviewStep5 from "./CreateReviewStep5";
 import ReviewManagement from "../reviews-management/ReviewManagement";
+import { ApiRecord } from "@/lib/api/backendApi";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { toNumber } from "../../utils/backendMappers";
 
 interface CampaignItem {
   id: string;
@@ -17,16 +20,35 @@ interface CampaignItem {
   spend: number;
 }
 
-const initialCampaigns: CampaignItem[] = [
-  { id: "1", name: "NeoWatch Series 5 Launch", createdDate: "Oct 12, 2023", status: "Active", reviews: 482, todayReviews: 22, spend: 1108.60 },
-  { id: "2", name: "Acoustic Pro Refresh", createdDate: "Nov 01, 2023", status: "Active", reviews: 295, todayReviews: 18, spend: 678.50 },
-  { id: "3", name: "PureFlow Kettle Beta", createdDate: "Oct 28, 2023", status: "Paused", reviews: 154, todayReviews: 0, spend: 354.20 },
-];
+const mapCampaign = (campaign: ApiRecord): CampaignItem => ({
+  id: String(campaign.id),
+  name: String(campaign.name ?? "Untitled review campaign"),
+  createdDate:
+    typeof campaign.created_at === "string"
+      ? new Date(campaign.created_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "",
+  status: String(campaign.status).toLowerCase() === "active" ? "Active" : "Paused",
+  reviews: Array.isArray(campaign.prompts) ? campaign.prompts.length : 0,
+  todayReviews: 0,
+  spend: toNumber(campaign.daily_budget),
+});
+
+const parseMoney = (value: string) => {
+  const amount = Number(value.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(amount) && amount > 0 ? amount : 2;
+};
 
 export default function ReviewsView() {
   const [step, setStep] = useState<0 | 1 | 2 | 3 | 5 | 6 | 7>(0);
-  const [campaigns, setCampaigns] = useState<CampaignItem[]>(initialCampaigns);
   const [selectedCamp, setSelectedCamp] = useState<CampaignItem | null>(null);
+  const [submitError, setSubmitError] = useState("");
+  const apiCampaigns = useBrandApiStore((state) => state.reviewCampaigns);
+  const apiProducts = useBrandApiStore((state) => state.products);
+  const createReviewCampaign = useBrandApiStore((state) => state.createReviewCampaign);
 
   const [draft, setDraft] = useState({
     name: "",
@@ -46,22 +68,37 @@ export default function ReviewsView() {
       reward: "$2.00 Cashback",
       budget: 100,
     });
+    setSubmitError("");
     setStep(1);
   };
 
-  const handlePublish = () => {
-    const newCamp: CampaignItem = {
-      id: String(campaigns.length + 1),
-      name: draft.name || "Summer Influencer Review Drive",
-      createdDate: "Today",
-      status: draft.isActive ? "Active" : "Paused",
-      reviews: 0,
-      todayReviews: 0,
-      spend: 0,
-    };
-    setCampaigns([newCamp, ...campaigns]);
-    setStep(0);
+  const handlePublish = async () => {
+    try {
+      setSubmitError("");
+      await createReviewCampaign({
+        name: draft.name || "Untitled Review Campaign",
+        description: draft.description,
+        productIds: draft.selectedIds,
+        dailyBudget: draft.budget,
+        rewardAmount: parseMoney(draft.reward),
+        isActive: draft.isActive,
+      });
+      setStep(0);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Could not publish review campaign.");
+    }
   };
+
+  const campaigns = apiCampaigns.map(mapCampaign);
+  const selectableProducts = apiProducts.map((product) => ({
+    id: product.id,
+    name: product.name,
+    category: product.category,
+    imageSrc: product.imageSrc,
+  }));
+  const selectedProducts = selectableProducts.filter((product) =>
+    draft.selectedIds.includes(product.id)
+  );
 
   return (
     <div className="w-full">
@@ -72,6 +109,11 @@ export default function ReviewsView() {
           onViewDetail={(camp) => { setSelectedCamp(camp); setStep(6); }}
           onReviewManagement={() => setStep(7)}
         />
+      )}
+      {submitError && (
+        <div className="mb-4 bg-red-50 border border-red-100 text-red-700 text-sm font-semibold rounded-xl px-4 py-3">
+          {submitError}
+        </div>
       )}
 
       {step === 1 && (
@@ -85,6 +127,7 @@ export default function ReviewsView() {
       {step === 2 && (
         <CreateReviewStep2
           initialSelectedIds={draft.selectedIds}
+          products={selectableProducts}
           onBack={() => setStep(1)}
           onContinue={(ids) => { setDraft({ ...draft, selectedIds: ids }); setStep(3); }}
         />
@@ -107,6 +150,7 @@ export default function ReviewsView() {
             budget: draft.budget,
             selectedCount: draft.selectedIds.length,
           }}
+          selectedProducts={selectedProducts}
           onBack={() => setStep(3)}
           onPublish={handlePublish}
         />

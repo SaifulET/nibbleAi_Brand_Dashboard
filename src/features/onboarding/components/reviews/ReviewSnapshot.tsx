@@ -1,5 +1,16 @@
 /* eslint-disable @next/next/no-img-element */
+"use client";
+
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatInteger, formatMoney, toNumber } from "../../utils/backendMappers";
+
 export default function ReviewSnapshot() {
+  const analyticsOverview = useBrandApiStore((state) => state.analyticsOverview);
+  const spend = (analyticsOverview?.spend || {}) as Record<string, unknown>;
+  const totalReviews = toNumber(analyticsOverview?.reviews);
+  const reviewSpend = toNumber(spend.review_reward) + toNumber(spend.review_fee);
+  const costPerReview = totalReviews ? reviewSpend / totalReviews : 0;
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex justify-between items-center w-full">
@@ -33,7 +44,7 @@ export default function ReviewSnapshot() {
               TOTAL REVIEWS
             </span>
             <span className="text-3xl font-extrabold text-[#131B2E] mt-1.5 leading-none">
-              452
+              {formatInteger(totalReviews)}
             </span>
             <span className="text-[11px] font-bold text-[#059669] flex items-center gap-1 mt-1 leading-none">
               <span>✓</span> 18% from last month
@@ -55,7 +66,7 @@ export default function ReviewSnapshot() {
               REVIEW SPEND
             </span>
             <span className="text-3xl font-extrabold text-[#131B2E] mt-1.5 leading-none">
-              $2,260
+              {formatMoney(reviewSpend)}
             </span>
             <span className="text-[11px] font-medium text-[#454656] mt-1.5 leading-none">
               Budget utilization: 84%
@@ -77,7 +88,7 @@ export default function ReviewSnapshot() {
               COST PER REVIEW
             </span>
             <span className="text-3xl font-extrabold text-[#131B2E] mt-1.5 leading-none">
-              $5.00
+              {formatMoney(costPerReview)}
             </span>
             <span className="text-[11px] font-medium text-[#454656] mt-1.5 leading-none">
               Targeting: $4.50

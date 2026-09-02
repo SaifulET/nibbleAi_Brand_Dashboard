@@ -4,7 +4,8 @@ import { useState } from "react";
 import AnalyticsOverview from "./AnalyticsOverview";
 import AnalyticsRebates from "./AnalyticsRebates";
 import AnalyticsReviews from "./AnalyticsReviews";
-import { Search, Bell, Calendar } from "lucide-react";
+import AnalyticsProducts from "./AnalyticsProducts";
+import { Calendar } from "lucide-react";
 
 export default function AnalyticsView() {
   const [activeTabSetting, setActiveTabSetting] = useState<"overview" | "Rebates" | "Reviews" | "Products">("overview");
@@ -50,15 +51,12 @@ export default function AnalyticsView() {
         {(["overview", "Rebates", "Reviews", "Products"] as const).map(tab => (
           <button
             key={tab}
-            onClick={() => tab !== "Products" && setActiveTabSetting(tab)}
+            onClick={() => setActiveTabSetting(tab)}
             className={`px-6 py-2 text-xs font-bold rounded-full transition-all border-none cursor-pointer ${
               activeTabSetting === tab 
                 ? "bg-white text-[#001BD2] shadow-sm" 
-                : tab === "Products" 
-                  ? "text-slate-400 cursor-not-allowed opacity-50"
-                  : "text-[#454656] hover:text-slate-700"
+                : "text-[#454656] hover:text-slate-700"
             }`}
-            disabled={tab === "Products"}
           >
             {tab}
           </button>
@@ -70,6 +68,7 @@ export default function AnalyticsView() {
         {activeTabSetting === "overview" && <AnalyticsOverview />}
         {activeTabSetting === "Rebates" && <AnalyticsRebates />}
         {activeTabSetting === "Reviews" && <AnalyticsReviews />}
+        {activeTabSetting === "Products" && <AnalyticsProducts />}
       </div>
 
     </div>

@@ -2,8 +2,11 @@
 "use client";
 
 import { UserPlus, MoreVertical, ShieldAlert, Award } from "lucide-react";
+import { ApiRecord } from "@/lib/api/backendApi";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
 
 interface Member {
+  id: string;
   name: string;
   avatar: string;
   joinDate: string;
@@ -16,14 +19,26 @@ interface TeamTabProps {
   onInviteClick: () => void;
 }
 
-const mockMembers: Member[] = [
-  { name: "Alex Rivero", avatar: "/Notification/profile1.svg", joinDate: "Joined Oct 2023", email: "alex.rivero@nibbl.io", role: "Admin", lastActive: "2 mins ago" },
-  { name: "Elena Soros", avatar: "/Notification/profile1.svg", joinDate: "Joined Jan 2024", email: "elena.s@nibbl.io", role: "Manager", lastActive: "Yesterday" },
-  { name: "Marcus Chen", avatar: "/Notification/profile1.svg", joinDate: "Joined Dec 2023", email: "m.chen@nibbl.io", role: "Reviewer", lastActive: "3 hours ago" },
-  { name: "David Vance", avatar: "/Notification/profile1.svg", joinDate: "Joined Feb 2024", email: "vance@nibbl.io", role: "Finance Analyst", lastActive: "Last Week" }
-];
+const mapMember = (member: ApiRecord): Member => ({
+  id: String(member.id),
+  name: String(member.user_full_name ?? member.user_email ?? "Team member"),
+  avatar: "/Notification/profile1.svg",
+  joinDate:
+    typeof member.created_at === "string"
+      ? `Joined ${new Date(member.created_at).toLocaleDateString("en-US", {
+          month: "short",
+          year: "numeric",
+        })}`
+      : "Joined",
+  email: String(member.user_email ?? ""),
+  role: String(member.role ?? "member"),
+  lastActive: member.is_active === false ? "Inactive" : "Active",
+});
 
 export default function TeamTab({ onInviteClick }: TeamTabProps) {
+  const members = useBrandApiStore((state) => state.members).map(mapMember);
+  const removeMember = useBrandApiStore((state) => state.removeMember);
+
   return (
     <div className="flex flex-col gap-8 w-full text-left font-manrope">
       
@@ -41,7 +56,7 @@ export default function TeamTab({ onInviteClick }: TeamTabProps) {
       {/* Stats Bento Card */}
       <div className="bg-white border border-[#C5C5D9]/10 shadow-[0px_1px_2px_rgba(0,0,0,0.05)] rounded-[20px] p-6 w-[200px]">
         <span className="text-[10px] font-extrabold text-[#454656]/60 tracking-wider uppercase">Total Members</span>
-        <h4 className="font-jakarta font-extrabold text-3xl text-[#131B2E] mt-2">42</h4>
+        <h4 className="font-jakarta font-extrabold text-3xl text-[#131B2E] mt-2">{members.length}</h4>
       </div>
 
       {/* Member Directory Table */}
@@ -61,8 +76,8 @@ export default function TeamTab({ onInviteClick }: TeamTabProps) {
               </tr>
             </thead>
             <tbody>
-              {mockMembers.map((m, i) => (
-                <tr key={i} className="border-b border-[#C5C5D9]/10 hover:bg-[#F2F3FF]/30 transition-colors text-sm text-[#454656] font-manrope">
+              {members.map((m) => (
+                <tr key={m.id} className="border-b border-[#C5C5D9]/10 hover:bg-[#F2F3FF]/30 transition-colors text-sm text-[#454656] font-manrope">
                   <td className="p-5 text-left flex items-center gap-3">
                     <img src={m.avatar} alt={m.name} className="w-10 h-10 rounded-full object-cover" />
                     <div className="flex flex-col text-left">
@@ -78,10 +93,17 @@ export default function TeamTab({ onInviteClick }: TeamTabProps) {
                   </td>
                   <td className="p-5 text-left font-medium">{m.lastActive}</td>
                   <td className="p-5 text-right">
-                    <button className="bg-transparent border-none cursor-pointer text-slate-400 hover:text-[#131B2E]"><MoreVertical className="w-4 h-4" /></button>
+                    <button onClick={() => void removeMember(m.id)} className="bg-transparent border-none cursor-pointer text-slate-400 hover:text-[#131B2E]" title="Remove member"><MoreVertical className="w-4 h-4" /></button>
                   </td>
                 </tr>
               ))}
+              {members.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-10 text-center text-sm font-semibold text-slate-400">
+                    No team members found.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

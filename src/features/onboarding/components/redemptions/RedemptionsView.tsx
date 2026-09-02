@@ -5,6 +5,9 @@ import RedemptionsStats from "./RedemptionsStats";
 import RedemptionsTable from "./RedemptionsTable";
 import RedemptionDetailsView from "./RedemptionDetailsView";
 import RedemptionDrawer from "./RedemptionDrawer";
+import { ApiRecord } from "@/lib/api/backendApi";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatDate, formatMoney, formatTime, toNumber } from "../../utils/backendMappers";
 
 interface RedemptionItem {
   id: string;
@@ -26,110 +29,77 @@ interface RedemptionItem {
   priority?: "High" | "Medium";
 }
 
-const mockRedemptions: RedemptionItem[] = [
-  {
-    id: "rem1",
-    userName: "Alex Sterling",
-    userEmail: "alex.s@gmail.com",
-    userAvatar: "/Notification/profile1.svg",
-    userIdCode: "88231-A",
-    redemptionsCount: 14,
-    reviewsCount: 2,
-    campaignName: "Summer Fuel 2024",
-    subBrand: "National Petroleum",
+const mapIssuedRedemption = (item: ApiRecord): RedemptionItem => ({
+  id: String(item.id),
+  userName: String(item.user_email ?? "Customer"),
+  userEmail: String(item.user_email ?? ""),
+  userAvatar: "",
+  userIdCode: String(item.user ?? item.id).slice(0, 8),
+  redemptionsCount: 1,
+  reviewsCount: 0,
+  campaignName: String(item.campaign_name ?? "Campaign"),
+  subBrand: String(item.brand_name ?? ""),
+  receiptThumbnailUrl: "/redemption/receipe.svg",
+  claimedTierLabel: "Rewards",
+  claimedTierValue: formatMoney(item.reward_amount),
+  submittedDate: formatDate(item.issued_at ?? item.created_at),
+  submittedTime: formatTime(item.issued_at ?? item.created_at),
+  status: "Approved",
+});
+
+const mapManualReview = (item: ApiRecord): RedemptionItem => {
+  const receipt = (item.receipt || {}) as ApiRecord;
+  return {
+    id: String(item.id),
+    userName: "Customer",
+    userEmail: "",
+    userAvatar: "",
+    userIdCode: String(receipt.id ?? item.id).slice(0, 8),
+    redemptionsCount: 0,
+    reviewsCount: 0,
+    campaignName: String(receipt.campaign_name ?? "Campaign"),
+    subBrand: String(receipt.brand_name ?? ""),
     receiptThumbnailUrl: "/redemption/receipe.svg",
     claimedTierLabel: "Rewards",
-    claimedTierValue: "$15.00",
-    submittedDate: "May 12, 2024",
-    submittedTime: "14:23 GMT",
-    status: "Pending",
-  },
-  {
-    id: "rem2",
-    userName: "Maya Vance",
-    userEmail: "maya.v@outlook.com",
-    userAvatar: "",
-    userIdCode: "99120-C",
-    redemptionsCount: 8,
-    reviewsCount: 1,
-    campaignName: "Gourmet Rewards",
-    subBrand: "Whole Foods Market",
-    receiptThumbnailUrl: "/redemption/receipe.svg",
-    claimedTierLabel: "Cashback",
-    claimedTierValue: "$4.50",
-    submittedDate: "May 11, 2024",
-    submittedTime: "09:12 GMT",
-    status: "Pending",
-  },
-  {
-    id: "rem3",
-    userName: "Julian Drake",
-    userEmail: "j.drake@nibbl.io",
-    userAvatar: "",
-    userIdCode: "44521-X",
-    redemptionsCount: 22,
-    reviewsCount: 6,
-    campaignName: "Spring Clean Eco",
-    subBrand: "Patagonia Shop",
-    receiptThumbnailUrl: "/redemption/receipe.svg",
-    claimedTierLabel: "Credits",
-    claimedTierValue: "$28.40",
-    submittedDate: "May 11, 2024",
-    submittedTime: "08:45 GMT",
-    status: "Pending",
-  },
-  {
-    id: "rem4",
-    userName: "Elena Rodriguez",
-    userEmail: "elena.r@gmail.com",
-    userAvatar: "",
-    userIdCode: "88231-A",
-    redemptionsCount: 12,
-    reviewsCount: 3,
-    campaignName: "Winter Bloom 2024",
-    subBrand: "National Petroleum",
-    receiptThumbnailUrl: "/redemption/receipe.svg",
-    claimedTierLabel: "Rewards",
-    claimedTierValue: "$12.00",
-    submittedDate: "Oct 24, 2023",
-    submittedTime: "09:12 AM",
+    claimedTierValue: formatMoney(receipt.reward_amount),
+    submittedDate: formatDate(item.created_at),
+    submittedTime: formatTime(item.created_at),
     status: "Manual Review",
-    issue: "OCR Mismatch: Total $45.20 mismatch",
-    priority: "High",
-  },
-  {
-    id: "rem5",
-    userName: "Marcus Thorne",
-    userEmail: "marcus.t@nibbl.io",
-    userAvatar: "",
-    userIdCode: "99120-C",
-    redemptionsCount: 5,
-    reviewsCount: 1,
-    campaignName: "Fresh Start Refresh",
-    subBrand: "Whole Foods Market",
-    receiptThumbnailUrl: "/redemption/receipe.svg",
-    claimedTierLabel: "Cashback",
-    claimedTierValue: "$6.50",
-    submittedDate: "Oct 24, 2023",
-    submittedTime: "10:45 AM",
-    status: "Manual Review",
-    issue: "Unclear Receipt: Blurry merchant logo",
-    priority: "Medium",
-  },
-];
+    issue: String(receipt.decision_reason ?? "Receipt requires manual review"),
+    priority: toNumber(receipt.total) >= 50 ? "High" : "Medium",
+  };
+};
 
 export default function RedemptionsView() {
-  const [redemptions, setRedemptions] = useState<RedemptionItem[]>(mockRedemptions);
   const [selectedItem, setSelectedItem] = useState<RedemptionItem | null>(null);
+  const [actionError, setActionError] = useState("");
+  const issuedRedemptions = useBrandApiStore((state) => state.redemptions);
+  const reviewQueue = useBrandApiStore((state) => state.reviewQueue);
+  const approveReviewQueueItem = useBrandApiStore((state) => state.approveReviewQueueItem);
+  const declineReviewQueueItem = useBrandApiStore((state) => state.declineReviewQueueItem);
+  const redemptions = [
+    ...reviewQueue.map(mapManualReview),
+    ...issuedRedemptions.map(mapIssuedRedemption),
+  ];
 
-  const handleApprove = (id: string) => {
-    setRedemptions(prev => prev.map(r => r.id === id ? { ...r, status: "Approved" } : r));
-    setSelectedItem(null);
+  const handleApprove = async (id: string) => {
+    try {
+      setActionError("");
+      await approveReviewQueueItem(id);
+      setSelectedItem(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not approve review item.");
+    }
   };
 
-  const handleReject = (id: string) => {
-    setRedemptions(prev => prev.map(r => r.id === id ? { ...r, status: "Rejected" } : r));
-    setSelectedItem(null);
+  const handleReject = async (id: string) => {
+    try {
+      setActionError("");
+      await declineReviewQueueItem(id, "Declined from brand dashboard.");
+      setSelectedItem(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not reject review item.");
+    }
   };
 
   const isDetailsPage = selectedItem && (
@@ -158,7 +128,7 @@ export default function RedemptionsView() {
               Redemptions
             </h2>
             <span className="bg-[#001BD2]/10 text-[#001BD2] font-bold text-xs px-3 py-1 rounded-full flex items-center leading-none mt-0.5">
-              1,240
+              {redemptions.length}
             </span>
           </div>
           <p className="text-[#454656] text-sm md:text-base font-medium mt-1">
@@ -169,6 +139,12 @@ export default function RedemptionsView() {
         {/* Stats stack next to header */}
         <RedemptionsStats />
       </div>
+
+      {actionError && (
+        <div className="bg-red-50 border border-red-100 text-red-700 text-sm font-semibold rounded-xl px-4 py-3">
+          {actionError}
+        </div>
+      )}
 
       {/* Main Redemptions List Table */}
       <RedemptionsTable

@@ -15,7 +15,7 @@ interface Product {
 interface EditAliasesModalProps {
   product: Product;
   onClose: () => void;
-  onSave: (aliases: string[]) => void;
+  onSave: (aliases: string[]) => void | Promise<void>;
 }
 
 export default function EditAliasesModal({ product, onClose, onSave }: EditAliasesModalProps) {
@@ -34,8 +34,8 @@ export default function EditAliasesModal({ product, onClose, onSave }: EditAlias
     setAliases(aliases.filter((a) => a !== alias));
   };
 
-  const handleSave = () => {
-    onSave(aliases);
+  const handleSave = async () => {
+    await onSave(aliases);
   };
 
   return (

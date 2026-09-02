@@ -1,5 +1,18 @@
 /* eslint-disable @next/next/no-img-element */
+"use client";
+
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatInteger, formatMoney, toNumber } from "../../utils/backendMappers";
+
 export default function RebateSnapshot() {
+  const analyticsOverview = useBrandApiStore((state) => state.analyticsOverview);
+  const spend = (analyticsOverview?.spend || {}) as Record<string, unknown>;
+  const verifiedPurchases = toNumber(analyticsOverview?.approvals);
+  const rebateSpend = toNumber(spend.rebate_reward) + toNumber(spend.rebate_fee);
+  const redemptions = toNumber(analyticsOverview?.redemptions);
+  const costPerPurchase = verifiedPurchases ? rebateSpend / verifiedPurchases : 0;
+  const averageRebate = redemptions ? toNumber(spend.rebate_reward) / redemptions : 0;
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex justify-between items-center">
@@ -30,7 +43,7 @@ export default function RebateSnapshot() {
               VERIFIED PURCHASES
             </span>
             <span className="text-[30px] font-extrabold text-[#131B2E]">
-              1,284
+              {formatInteger(verifiedPurchases)}
             </span>
           </div>
 
@@ -59,7 +72,7 @@ export default function RebateSnapshot() {
               REBATE SPEND
             </span>
             <span className="text-[30px] font-extrabold text-[#131B2E]">
-              $14,200
+              {formatMoney(rebateSpend, { compact: true })}
             </span>
           </div>
 
@@ -93,7 +106,7 @@ export default function RebateSnapshot() {
               COST PER PURCHASE
             </span>
             <span className="text-[30px] font-extrabold text-[#131B2E]">
-              $11.05
+              {formatMoney(costPerPurchase)}
             </span>
           </div>
 
@@ -122,7 +135,7 @@ export default function RebateSnapshot() {
               AVERAGE REBATE PAID
             </span>
             <span className="text-[30px] font-extrabold text-[#131B2E]">
-              $15.20
+              {formatMoney(averageRebate)}
             </span>
           </div>
 

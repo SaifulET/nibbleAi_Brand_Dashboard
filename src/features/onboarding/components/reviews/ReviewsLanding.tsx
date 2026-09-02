@@ -1,5 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatInteger, formatMoney, toNumber } from "../../utils/backendMappers";
 
 interface CampaignItem {
   id: string;
@@ -20,6 +22,12 @@ interface ReviewsLandingProps {
 
 export default function ReviewsLanding({ campaigns, onCreateNew, onViewDetail, onReviewManagement }: ReviewsLandingProps) {
   const [activeTab, setActiveTab] = useState("Overview");
+  const analyticsOverview = useBrandApiStore((state) => state.analyticsOverview);
+  const spend = (analyticsOverview?.spend || {}) as Record<string, unknown>;
+  const totalReviews = toNumber(analyticsOverview?.reviews);
+  const reviewSpend = toNumber(spend.review_reward) + toNumber(spend.review_fee);
+  const costPerReview = totalReviews ? reviewSpend / totalReviews : 0;
+  const dailyBudget = campaigns.reduce((sum, campaign) => sum + campaign.spend, 0);
 
   return (
     <div className="flex flex-col gap-8 w-full animate-slide-up text-left font-manrope">
@@ -72,7 +80,7 @@ export default function ReviewsLanding({ campaigns, onCreateNew, onViewDetail, o
             <span className="bg-[#E2E7FF] text-[#001BD2] text-[9px] font-bold px-2 py-0.5 rounded-full">ACTIVE</span>
           </div>
           <div className="flex flex-col gap-0.5 mt-2">
-            <span className="text-[22px] font-extrabold text-[#131B2E]">12</span>
+            <span className="text-[22px] font-extrabold text-[#131B2E]">{formatInteger(campaigns.length)}</span>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">REVIEW CAMPAIGNS</span>
           </div>
         </div>
@@ -83,7 +91,7 @@ export default function ReviewsLanding({ campaigns, onCreateNew, onViewDetail, o
             <img src="/reviews/dailyBudget.svg" alt="Budget" className="w-5 h-5 object-contain" />
           </span>
           <div className="flex flex-col gap-0.5 mt-2">
-            <span className="text-[22px] font-extrabold text-[#131B2E]">$450.00</span>
+            <span className="text-[22px] font-extrabold text-[#131B2E]">{formatMoney(dailyBudget)}</span>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">DAILY BUDGET</span>
           </div>
         </div>
@@ -94,7 +102,7 @@ export default function ReviewsLanding({ campaigns, onCreateNew, onViewDetail, o
             <img src="/reviews/TotalReviews.svg" alt="Total reviews" className="w-5 h-5 object-contain" />
           </span>
           <div className="flex flex-col gap-0.5 mt-2">
-            <span className="text-[22px] font-extrabold text-[#131B2E]">1,240</span>
+            <span className="text-[22px] font-extrabold text-[#131B2E]">{formatInteger(totalReviews)}</span>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">TOTAL REVIEWS (30D)</span>
           </div>
         </div>
@@ -105,7 +113,7 @@ export default function ReviewsLanding({ campaigns, onCreateNew, onViewDetail, o
             <img src="/reviews/ReviewSpend.svg" alt="Spend" className="w-5 h-5 object-contain" />
           </span>
           <div className="flex flex-col gap-0.5 mt-2">
-            <span className="text-[22px] font-extrabold text-[#131B2E]">$2,850.00</span>
+            <span className="text-[22px] font-extrabold text-[#131B2E]">{formatMoney(reviewSpend)}</span>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">REVIEW SPEND</span>
           </div>
         </div>
@@ -116,7 +124,7 @@ export default function ReviewsLanding({ campaigns, onCreateNew, onViewDetail, o
             <img src="/reviews/CostperReview.svg" alt="Cost" className="w-5 h-5 object-contain" />
           </span>
           <div className="flex flex-col gap-0.5 mt-2">
-            <span className="text-[22px] font-extrabold text-[#131B2E]">$2.30</span>
+            <span className="text-[22px] font-extrabold text-[#131B2E]">{formatMoney(costPerReview)}</span>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">COST PER REVIEW</span>
           </div>
         </div>

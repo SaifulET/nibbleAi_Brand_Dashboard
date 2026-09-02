@@ -5,7 +5,7 @@ import { Mail, Check, X } from "lucide-react";
 
 interface InviteUserModalProps {
   onClose: () => void;
-  onSend: (email: string, role: string) => void;
+  onSend: (email: string, role: string) => void | Promise<void>;
 }
 
 export default function InviteUserModal({ onClose, onSend }: InviteUserModalProps) {
@@ -90,7 +90,7 @@ export default function InviteUserModal({ onClose, onSend }: InviteUserModalProp
         {/* Modal Footer */}
         <div className="bg-[#FAF8FF] px-8 py-5 border-t border-[#C5C5D9]/15 flex justify-end gap-3">
           <button onClick={onClose} className="px-6 py-2.5 bg-transparent hover:bg-slate-50 text-xs font-extrabold text-[#001BD2] border-none rounded-full cursor-pointer uppercase tracking-wider">Cancel</button>
-          <button onClick={() => { onSend(email, role); onClose(); }} className="px-6 py-2.5 bg-gradient-to-r from-[#001BD2] to-[#2D3FEA] hover:opacity-95 text-xs font-extrabold text-white border-none rounded-full cursor-pointer shadow-[0px_8px_16px_rgba(0,27,210,0.15)] uppercase tracking-wider">Send Invitation</button>
+          <button onClick={async () => { await onSend(email, role); onClose(); }} className="px-6 py-2.5 bg-gradient-to-r from-[#001BD2] to-[#2D3FEA] hover:opacity-95 text-xs font-extrabold text-white border-none rounded-full cursor-pointer shadow-[0px_8px_16px_rgba(0,27,210,0.15)] uppercase tracking-wider">Send Invitation</button>
         </div>
 
       </div>

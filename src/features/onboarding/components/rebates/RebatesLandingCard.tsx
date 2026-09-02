@@ -16,7 +16,8 @@ interface RebatesLandingCardProps {
 }
 
 export default function RebatesLandingCard({ campaign, onEdit }: RebatesLandingCardProps) {
-  const isNearLimit = campaign.spendToday / campaign.dailyBudget >= 0.9;
+  const spendRatio = campaign.dailyBudget ? campaign.spendToday / campaign.dailyBudget : 0;
+  const isNearLimit = spendRatio >= 0.9;
   const isPaused = campaign.status === "PAUSED";
   const isCompleted = campaign.status === "COMPLETED";
 
@@ -90,7 +91,7 @@ export default function RebatesLandingCard({ campaign, onEdit }: RebatesLandingC
         <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
           <div
             className={`absolute left-0 top-0 bottom-0 rounded-full transition-all duration-300 ${progressBg}`}
-            style={{ width: `${Math.min((campaign.spendToday / campaign.dailyBudget) * 100, 100)}%` }}
+            style={{ width: `${Math.min(spendRatio * 100, 100)}%` }}
           ></div>
         </div>
       </div>

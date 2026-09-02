@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import RedemptionRow from "./RedemptionRow";
 
 interface RedemptionItem {
@@ -38,12 +38,31 @@ export default function RedemptionsTable({ redemptions, onViewDetails, onApprove
   const [showDate, setShowDate] = useState(false);
   const [showTier, setShowTier] = useState(false);
   const [page, setPage] = useState(1);
+  const [thirtyDaysAgo] = useState(() => Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  useEffect(() => { setPage(1); }, [activeTab, dateFilter, tierFilter]);
+  const selectTab = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setPage(1);
+  };
+
+  const selectDateFilter = (value: string) => {
+    setDateFilter(value);
+    setShowDate(false);
+    setPage(1);
+  };
+
+  const selectTierFilter = (value: string) => {
+    setTierFilter(value);
+    setShowTier(false);
+    setPage(1);
+  };
 
   let filtered = redemptions.filter(r => r.status === activeTab);
   if (dateFilter === "Last 30 Days") {
-    filtered = filtered.filter(r => r.submittedDate.includes("May"));
+    filtered = filtered.filter((r) => {
+      const timestamp = new Date(`${r.submittedDate} ${r.submittedTime}`).getTime();
+      return Number.isNaN(timestamp) || timestamp >= thirtyDaysAgo;
+    });
   }
   if (tierFilter !== "All Tiers") {
     const num = tierFilter.split(" ")[1];
@@ -60,7 +79,7 @@ export default function RedemptionsTable({ redemptions, onViewDetails, onApprove
       <div className="bg-white border border-[#C5C5D9]/10 shadow-sm rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center w-full gap-4 relative">
         <div className="bg-[#F2F3FF] p-1 rounded-full flex items-center gap-1.5 overflow-x-auto">
           {(["Pending", "Approved", "Rejected", "Expired", "Manual Review"] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-5 py-2 text-xs font-bold rounded-full transition-all border-none cursor-pointer ${activeTab === tab ? "bg-white text-[#001BD2] shadow-sm" : "text-[#454656] hover:text-slate-700"}`}>
+            <button key={tab} onClick={() => selectTab(tab)} className={`px-5 py-2 text-xs font-bold rounded-full transition-all border-none cursor-pointer ${activeTab === tab ? "bg-white text-[#001BD2] shadow-sm" : "text-[#454656] hover:text-slate-700"}`}>
               {tab}
             </button>
           ))}
@@ -73,7 +92,7 @@ export default function RedemptionsTable({ redemptions, onViewDetails, onApprove
             {showDate && (
               <div className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 shadow-lg rounded-xl py-1 z-30">
                 {["Last 30 Days", "All Time"].map(d => (
-                  <button key={d} onClick={() => { setDateFilter(d); setShowDate(false); }} className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 border-none bg-transparent cursor-pointer text-[#131B2E]">{d}</button>
+                  <button key={d} onClick={() => selectDateFilter(d)} className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 border-none bg-transparent cursor-pointer text-[#131B2E]">{d}</button>
                 ))}
               </div>
             )}
@@ -85,7 +104,7 @@ export default function RedemptionsTable({ redemptions, onViewDetails, onApprove
             {showTier && (
               <div className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 shadow-lg rounded-xl py-1 z-30">
                 {["All Tiers", "Tier 1", "Tier 3", "Tier 5"].map(t => (
-                  <button key={t} onClick={() => { setTierFilter(t); setShowTier(false); }} className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 border-none bg-transparent cursor-pointer text-[#131B2E]">{t}</button>
+                  <button key={t} onClick={() => selectTierFilter(t)} className="w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 border-none bg-transparent cursor-pointer text-[#131B2E]">{t}</button>
                 ))}
               </div>
             )}

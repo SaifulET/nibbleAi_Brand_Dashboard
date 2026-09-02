@@ -5,24 +5,45 @@ import CustomerMetrics from "./CustomerMetrics";
 import CustomerLedger, { CustomerData } from "./CustomerLedger";
 import CustomerProfileView from "./CustomerProfileView";
 import SuspendCustomerModal from "./SuspendCustomerModal";
-import { Bell } from "lucide-react";
+import { ApiRecord } from "@/lib/api/backendApi";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatMoney, toNumber } from "../../utils/backendMappers";
 
-const initialCustomersList: CustomerData[] = [
-  { id: "1", name: "Alexander Knight", memberId: "NB-9021", email: "a.knight@portfolio.com", phone: "+1 (555) 012-9921", claims: 42, rewards: "$12,482.00", status: "Active", lastActivity: "2 mins ago", avatar: "/Notification/profile1.svg" },
-  { id: "2", name: "Helena Sterling", memberId: "NB-4452", email: "h.sterling@nexus.io", phone: "+44 20 7946 0124", claims: 15, rewards: "$4,290.50", status: "Active", lastActivity: "1 hour ago", avatar: "/Notification/profile1.svg" },
-  { id: "3", name: "Julian Rossi", memberId: "NB-1182", email: "rossi@vanguard.co", phone: "+1 (555) 321-0012", claims: 0, rewards: "$0.00", status: "Suspended", lastActivity: "3 days ago", avatar: "/Notification/profile1.svg" },
-  { id: "4", name: "Maya Thornton", memberId: "NB-7729", email: "maya.t@creative.studio", phone: "+61 2 9876 5432", claims: 8, rewards: "$2,150.75", status: "Active", lastActivity: "12 mins ago", avatar: "/Notification/profile1.svg" }
-];
+const mapCustomer = (customer: ApiRecord): CustomerData => {
+  const ref = String(customer.customer_ref ?? customer.id ?? "");
+  const email = String(customer.email ?? "");
+  const name = String(customer.full_name ?? (email || ref || "Anonymous customer"));
+  return {
+    id: ref,
+    name,
+    memberId: ref.slice(0, 12),
+    email: email || "Hidden by plan",
+    phone: "Unavailable",
+    claims: toNumber(customer.redemptions),
+    rewards: formatMoney(customer.total_earned),
+    status: "Active",
+    lastActivity: "Backend record",
+    avatar: "/Notification/profile1.svg",
+  };
+};
 
 export default function CustomersView() {
-  const [customers, setCustomers] = useState<CustomerData[]>(initialCustomersList);
   const [selectedCust, setSelectedCust] = useState<CustomerData | null>(null);
   const [modalCust, setModalCust] = useState<CustomerData | null>(null);
   const [filterTab, setFilterTab] = useState<"All" | "Active" | "Suspended">("All");
+  const apiCustomers = useBrandApiStore((state) => state.customers);
+  const [localStatuses, setLocalStatuses] = useState<Record<string, CustomerData["status"]>>({});
+  const customers = apiCustomers.map((customer) => {
+    const mapped = mapCustomer(customer);
+    return { ...mapped, status: localStatuses[mapped.id] || mapped.status };
+  });
 
   const handleConfirmToggle = () => {
     if (!modalCust) return;
-    setCustomers(prev => prev.map(c => c.id === modalCust.id ? { ...c, status: c.status === "Active" ? "Suspended" : "Active" } : c));
+    setLocalStatuses((prev) => ({
+      ...prev,
+      [modalCust.id]: modalCust.status === "Active" ? "Suspended" : "Active",
+    }));
     if (selectedCust && selectedCust.id === modalCust.id) {
       setSelectedCust(prev => prev ? { ...prev, status: prev.status === "Active" ? "Suspended" : "Active" } : null);
     }
@@ -30,6 +51,11 @@ export default function CustomersView() {
   };
 
   const filtered = customers.filter(c => filterTab === "All" || c.status === filterTab);
+  const totalClaims = customers.reduce((sum, customer) => sum + customer.claims, 0);
+  const totalRewards = apiCustomers.reduce(
+    (sum, customer) => sum + toNumber(customer.total_earned),
+    0
+  );
 
   return (
     <div className="flex flex-col gap-8 w-full animate-slide-up text-left font-manrope">
@@ -65,7 +91,12 @@ export default function CustomersView() {
             ))}
           </div>
 
-          <CustomerMetrics />
+          <CustomerMetrics
+            totalMembers={customers.length}
+            activePercent={customers.length ? `${Math.round((customers.filter((c) => c.status === "Active").length / customers.length) * 100)}%` : "0%"}
+            totalRewards={formatMoney(totalRewards)}
+            averageClaims={customers.length ? (totalClaims / customers.length).toFixed(1) : "0"}
+          />
           
           <CustomerLedger
             customers={filtered}

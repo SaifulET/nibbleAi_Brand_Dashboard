@@ -1,7 +1,17 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatMoney, toNumber } from "../../utils/backendMappers";
+
 export default function RedemptionsStats() {
+  const redemptions = useBrandApiStore((state) => state.redemptions);
+  const reviewQueue = useBrandApiStore((state) => state.reviewQueue);
+  const totalPaid = redemptions.reduce(
+    (sum, redemption) => sum + toNumber(redemption.reward_amount),
+    0
+  );
+
   return (
     <div className="flex flex-row items-start gap-4 flex-wrap">
       
@@ -12,10 +22,10 @@ export default function RedemptionsStats() {
         </div>
         <div className="flex flex-col justify-center">
           <span className="text-[10px] font-extrabold text-[#454656] tracking-[0.6px] uppercase leading-none">
-            Avg Response
+            Manual Queue
           </span>
           <span className="text-lg font-bold font-jakarta text-[#131B2E] mt-1 leading-none">
-            4.2h
+            {reviewQueue.length}
           </span>
         </div>
       </div>
@@ -30,7 +40,7 @@ export default function RedemptionsStats() {
             Total Paid
           </span>
           <span className="text-lg font-bold font-jakarta text-[#131B2E] mt-1 leading-none">
-            $12,482
+            {formatMoney(totalPaid)}
           </span>
         </div>
       </div>
