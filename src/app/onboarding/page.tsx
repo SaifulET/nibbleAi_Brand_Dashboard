@@ -1,5 +1,5 @@
-import OnboardingView from "@/features/onboarding/components/OnboardingView";
+import OnboardingClient from "./OnboardingClient";
 
 export default function OnboardingPage() {
-  return <OnboardingView />;
+  return <OnboardingClient />;
 }
