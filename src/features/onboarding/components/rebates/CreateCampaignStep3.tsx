@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
+import { Pencil, Rocket } from "lucide-react";
 
 interface RewardTier {
   id: string;
@@ -24,13 +25,31 @@ interface Step3Props {
   onBack: () => void;
   onContinue: (draft: BudgetOfferDraft) => void;
   tiers: RewardTier[];
+  initialData?: {
+    dailyBudget?: number;
+    fallback?: {
+      rewardAmount: string;
+      isEnabled: boolean;
+      description?: string;
+    };
+  };
   onAddCustomTierClick: () => void;
+  onEditTierClick: (tier: RewardTier) => void;
 }
-export default function CreateCampaignStep3({ onBack, onContinue, tiers, onAddCustomTierClick }: Step3Props) {
-  const [budget, setBudget] = useState("150");
-  const [fallbackActive, setFallbackActive] = useState(true);
-  const [fallbackReward, setFallbackReward] = useState("2.00");
-  const [fallbackDescription, setFallbackDescription] = useState("Fallback offer for receipts that do not meet a tier.");
+export default function CreateCampaignStep3({
+  onBack,
+  onContinue,
+  tiers,
+  initialData,
+  onAddCustomTierClick,
+  onEditTierClick,
+}: Step3Props) {
+  const [budget, setBudget] = useState(String(initialData?.dailyBudget ?? 150));
+  const [fallbackActive, setFallbackActive] = useState(initialData?.fallback?.isEnabled ?? true);
+  const [fallbackReward, setFallbackReward] = useState(initialData?.fallback?.rewardAmount ?? "2.00");
+  const [fallbackDescription, setFallbackDescription] = useState(
+    initialData?.fallback?.description || "Fallback offer for receipts that do not meet a tier."
+  );
   const showWarning = Number(budget) > 100;
   const daysRemaining = showWarning && Number(budget) > 0 ? Math.floor(2450 / Number(budget)) : 0;
   const totalAlloc = tiers.reduce((acc, t) => acc + t.allocation, 0);
@@ -48,16 +67,18 @@ export default function CreateCampaignStep3({ onBack, onContinue, tiers, onAddCu
   return (
     <div className="flex flex-col gap-8 w-full animate-slide-up text-left font-manrope">
       {/* Stepper indications */}
-      <div className="flex justify-between items-center w-full max-w-[800px] mx-auto font-semibold border-b border-slate-100 pb-4">
+      <div className="relative grid grid-cols-4 items-start gap-2 w-full max-w-[920px] mx-auto font-semibold border-b border-slate-100 py-3">
+        <div className="absolute left-[12.5%] right-[12.5%] top-[31px] h-[2px] bg-[#EAEDFF]"></div>
+        <div className="absolute left-[12.5%] w-[50%] top-[31px] h-[2px] bg-[#001BD2]"></div>
         {[
           { step: "1", title: "Basic Info", done: true },
           { step: "2", title: "Products", done: true },
           { step: "3", title: "Budget & Offers", active: true },
           { step: "4", title: "Review & publish", active: false },
         ].map((s) => (
-          <div key={s.step} className="flex items-center gap-2">
-            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${s.active ? "bg-[#001BD2] text-white" : "bg-[#001BD2]/20 text-[#001BD2]"}`}>{s.done && !s.active ? "✓" : s.step}</span>
-            <span className={s.active ? "text-[#001BD2] text-xs" : "text-slate-400 text-xs"}>{s.title}</span>
+          <div key={s.step} className="relative z-10 flex flex-col items-center gap-2 min-w-0">
+            <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${s.active ? "bg-[#001BD2] text-white shadow-[0_0_0_8px_#DFE0FF]" : "bg-[#DAE2FD] text-[#001BD2]"}`}>{s.done && !s.active ? "✓" : s.step}</span>
+            <span className={s.active ? "text-[#001BD2] text-xs text-center" : "text-slate-400 text-xs text-center"}>{s.title}</span>
           </div>
         ))}
       </div>
@@ -155,6 +176,7 @@ export default function CreateCampaignStep3({ onBack, onContinue, tiers, onAddCu
                     <th className="px-2">MAX PAYOUT</th>
                     <th className="px-2">MIN PURCHASE</th>
                     <th className="px-4 text-right">ALLOC.</th>
+                    <th className="px-4 text-right">EDIT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -166,6 +188,16 @@ export default function CreateCampaignStep3({ onBack, onContinue, tiers, onAddCu
                       <td className="px-2">${tier.maxPayout}</td>
                       <td className="px-2">{tier.minPurchase}</td>
                       <td className="px-4 text-right text-[#001BD2]">{tier.allocation}%</td>
+                      <td className="px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onEditTierClick(tier)}
+                          className="ml-auto w-8 h-8 rounded-full bg-[#001BD2] hover:bg-blue-700 transition-colors flex items-center justify-center shadow-sm active:scale-95 cursor-pointer"
+                          aria-label={`Edit ${tier.name}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-white" strokeWidth={2.4} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -203,7 +235,7 @@ export default function CreateCampaignStep3({ onBack, onContinue, tiers, onAddCu
         <button onClick={onBack} className="text-sm font-bold text-[#757688] hover:text-slate-600 cursor-pointer">← Back to Products</button>
         <button onClick={handleContinue} className="px-6 h-[46px] bg-[#001BD2] hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2">
           <span>Continue to Review</span>
-          <img src="/Rebate/continueToReviewIcon.svg" alt="Review" className="w-[14px] h-[14px] object-contain invert" />
+          <Rocket className="w-4 h-4 text-white" strokeWidth={2.4} />
         </button>
       </div>
     </div>

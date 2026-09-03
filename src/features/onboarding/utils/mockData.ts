@@ -11,12 +11,16 @@ export interface NotificationItem {
 export interface Product {
   id: string;
   name: string;
+  description?: string;
+  brand?: string;
   imageSrc: string;
   category: string;
   flavor: string;
   format: string;
   size: string;
+  sku?: string;
   aliases: string[];
+  aliasCount?: number;
   aliasRecords?: { id: string; alias_text: string }[];
   activeCampaigns: number;
 }

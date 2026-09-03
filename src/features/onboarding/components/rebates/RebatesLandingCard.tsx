@@ -1,4 +1,5 @@
-/* eslint-disable @next/next/no-img-element */
+import { Pencil } from "lucide-react";
+
 interface Campaign {
   id: string;
   name: string;
@@ -51,12 +52,9 @@ export default function RebatesLandingCard({ campaign, onEdit }: RebatesLandingC
         <button
           onClick={() => onEdit(campaign)}
           className="w-8 h-8 rounded-full bg-[#001BD2] hover:bg-blue-700 transition-colors flex items-center justify-center shadow-md active:scale-95 cursor-pointer"
+          aria-label="Edit campaign"
         >
-          <img
-            src="/Rebate/rebateEditIcon.svg"
-            alt="Edit"
-            className="w-3.5 h-3.5 object-contain invert"
-          />
+          <Pencil className="w-3.5 h-3.5 text-white" strokeWidth={2.4} />
         </button>
       </div>
 

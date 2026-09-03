@@ -33,6 +33,8 @@ interface RewardTier {
 
 interface CampaignDraft {
   name: string;
+  description?: string;
+  imageSrc?: string;
   startDate: string;
   endDate: string;
   isActive: boolean;
@@ -73,20 +75,73 @@ const parseRewardAmount = (reward: string) => {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
 };
 
+const dateInputValue = (value: unknown) => {
+  if (typeof value !== "string" || !value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
+
+const productIdsForCampaign = (campaign: ApiRecord) => {
+  const rawProducts = campaign.products ?? campaign.product ?? campaign.product_ids;
+  const products = Array.isArray(rawProducts) ? rawProducts : rawProducts ? [rawProducts] : [];
+
+  return products
+    .map((product) => {
+      if (product && typeof product === "object" && "id" in product) {
+        return String((product as { id: unknown }).id);
+      }
+      return String(product || "");
+    })
+    .filter(Boolean);
+};
+
+const tiersForCampaign = (campaign: ApiRecord): RewardTier[] => {
+  const campaignTiers = Array.isArray(campaign.tiers) ? campaign.tiers : [];
+  if (!campaignTiers.length) return initialTiers;
+
+  return campaignTiers.map((tier, index) => {
+    const record = tier as ApiRecord;
+    const rewardAmount = String(record.reward_amount ?? "1");
+    return {
+      id: String(record.id ?? index + 1),
+      name: `Tier ${index + 1}`,
+      structure: "Dollar Off",
+      reward: `$${rewardAmount} off`,
+      maxPayout: rewardAmount,
+      minPurchase: "",
+      allocation: toNumber(record.allocation_percent),
+    };
+  });
+};
+
 export default function RebatesView() {
   const [step, setStep] = useState<0 | 1 | 2 | 3 | 4 | 5>(0);
-  const [draftData, setDraftData] = useState<CampaignDraft>({ name: "", startDate: "", endDate: "", isActive: true });
+  const [draftData, setDraftData] = useState<CampaignDraft>({
+    name: "",
+    description: "",
+    imageSrc: "/Rebate/bannerPreviewImage.svg",
+    startDate: "",
+    endDate: "",
+    isActive: true,
+  });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [tiers, setTiers] = useState<RewardTier[]>(initialTiers);
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showAddTierModal, setShowAddTierModal] = useState(false);
+  const [editingTier, setEditingTier] = useState<RewardTier | null>(null);
   const [submitError, setSubmitError] = useState("");
   const apiCampaigns = useBrandApiStore((state) => state.campaigns);
   const apiProducts = useBrandApiStore((state) => state.products);
   const createCampaign = useBrandApiStore((state) => state.createCampaign);
+  const updateCampaign = useBrandApiStore((state) => state.updateCampaign);
 
   const stepProducts = apiProducts.map((product) => ({
     id: product.id,
     name: product.name,
+    brand: product.brand || "",
+    description: product.description || "",
     category: product.category,
     imageSrc: product.imageSrc,
   }));
@@ -94,18 +149,56 @@ export default function RebatesView() {
   const selectedProducts = stepProducts.filter((p) => selectedIds.includes(p.id));
 
   const handleCreateNewClick = () => {
-    setDraftData({ name: "", startDate: "", endDate: "", isActive: true });
+    setDraftData({
+      name: "",
+      description: "",
+      imageSrc: "/Rebate/bannerPreviewImage.svg",
+      startDate: "",
+      endDate: "",
+      isActive: true,
+    });
     setSelectedIds(stepProducts[0] ? [stepProducts[0].id] : []);
     setTiers(initialTiers);
+    setEditingCampaignId(null);
+    setSubmitError("");
+    setStep(1);
+  };
+
+  const handleEditCampaign = (campaign: Campaign) => {
+    const rawCampaign = apiCampaigns.find((item) => String(item.id) === campaign.id);
+    if (!rawCampaign) return;
+    const fallback = rawCampaign.fallback_offer as ApiRecord | undefined;
+    setDraftData({
+      name: String(rawCampaign.name ?? ""),
+      description: String(rawCampaign.description ?? ""),
+      imageSrc: typeof rawCampaign.image_url === "string" ? rawCampaign.image_url : "/Rebate/bannerPreviewImage.svg",
+      startDate: dateInputValue(rawCampaign.start_at),
+      endDate: dateInputValue(rawCampaign.end_at),
+      isActive: String(rawCampaign.status ?? "").toLowerCase() === "active",
+      dailyBudget: toNumber(rawCampaign.daily_budget),
+      fallback: fallback
+        ? {
+            rewardAmount: String(fallback.reward_amount ?? ""),
+            isEnabled: Boolean(fallback.is_enabled),
+            description: String(fallback.description ?? ""),
+          }
+        : undefined,
+    });
+    setSelectedIds(productIdsForCampaign(rawCampaign));
+    setTiers(tiersForCampaign(rawCampaign));
+    setEditingCampaignId(campaign.id);
     setSubmitError("");
     setStep(1);
   };
 
   const handlePublishCampaign = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
       setSubmitError("");
-      await createCampaign({
+      const payload = {
         name: draftData.name || "Untitled Rebate Campaign",
+        description: draftData.description,
         productIds: selectedIds,
         dailyBudget: draftData.dailyBudget ?? 150,
         startAt: draftData.startDate ? new Date(draftData.startDate).toISOString() : undefined,
@@ -118,10 +211,17 @@ export default function RebatesView() {
             rewardAmount: parseRewardAmount(tier.maxPayout || tier.reward),
             allocationPercent: tier.allocation,
           })),
-      });
+      };
+      if (editingCampaignId) {
+        await updateCampaign(editingCampaignId, payload);
+      } else {
+        await createCampaign(payload);
+      }
       setStep(5);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Could not publish campaign.");
+      setSubmitError(error instanceof Error ? error.message : "Could not save campaign.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -131,10 +231,20 @@ export default function RebatesView() {
     setShowAddTierModal(false);
   };
 
+  const handleUpdateTier = (updatedTier: Omit<RewardTier, "id">) => {
+    if (!editingTier) return;
+    setTiers(
+      tiers.map((tier) =>
+        tier.id === editingTier.id ? { id: editingTier.id, ...updatedTier } : tier
+      )
+    );
+    setEditingTier(null);
+  };
+
   return (
     <div className="w-full">
       {step === 0 && (
-        <RebatesLanding campaigns={campaigns} onCreateNew={handleCreateNewClick} onEditCampaign={() => setStep(1)} />
+        <RebatesLanding campaigns={campaigns} onCreateNew={handleCreateNewClick} onEditCampaign={handleEditCampaign} />
       )}
       {submitError && (
         <div className="mb-4 bg-red-50 border border-red-100 text-red-700 text-sm font-semibold rounded-xl px-4 py-3">
@@ -142,7 +252,12 @@ export default function RebatesView() {
         </div>
       )}
       {step === 1 && (
-        <CreateCampaignStep1 initialData={draftData} onCancel={() => setStep(0)} onContinue={(data) => { setDraftData((current) => ({ ...current, ...data })); setStep(2); }} />
+        <CreateCampaignStep1
+          mode={editingCampaignId ? "edit" : "create"}
+          initialData={draftData}
+          onCancel={() => setStep(0)}
+          onContinue={(data) => { setDraftData((current) => ({ ...current, ...data })); setStep(2); }}
+        />
       )}
       {step === 2 && (
         <CreateCampaignStep2 products={stepProducts} initialSelectedIds={selectedIds} onBack={() => setStep(1)} onContinue={(ids) => { setSelectedIds(ids); setStep(3); }} />
@@ -150,7 +265,9 @@ export default function RebatesView() {
       {step === 3 && (
         <CreateCampaignStep3
           tiers={tiers}
+          initialData={draftData}
           onBack={() => setStep(2)}
+          onEditTierClick={setEditingTier}
           onContinue={(budgetDraft) => {
             setDraftData((current) => ({ ...current, ...budgetDraft }));
             setStep(4);
@@ -159,13 +276,29 @@ export default function RebatesView() {
         />
       )}
       {step === 4 && (
-        <CreateCampaignStep4 draftData={draftData} selectedProducts={selectedProducts} tiers={tiers} onBack={() => setStep(3)} onPublish={handlePublishCampaign} />
+        <CreateCampaignStep4
+          draftData={draftData}
+          selectedProducts={selectedProducts}
+          tiers={tiers}
+          onBack={() => setStep(3)}
+          onPublish={handlePublishCampaign}
+          isPublishing={isSubmitting}
+          publishLabel={editingCampaignId ? "Save Changes" : "Publish Campaign"}
+        />
       )}
       {step === 5 && (
         <CreateCampaignSuccess onFinish={() => setStep(0)} />
       )}
       {showAddTierModal && (
         <AddCustomTierModal onClose={() => setShowAddTierModal(false)} onAdd={handleAddTier} />
+      )}
+      {editingTier && (
+        <AddCustomTierModal
+          mode="edit"
+          initialTier={editingTier}
+          onClose={() => setEditingTier(null)}
+          onAdd={handleUpdateTier}
+        />
       )}
     </div>
   );

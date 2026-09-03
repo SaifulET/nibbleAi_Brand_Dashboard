@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface AddProductViewProps {
   onCancel: () => void;
@@ -7,29 +7,93 @@ interface AddProductViewProps {
     name: string;
     description: string;
     brand: string;
+    imageSrc: string;
     category: string;
     flavor: string;
     format: string;
     size: string;
     aliases: string[];
+    imageFile?: File | null;
   }) => void | Promise<void>;
+  initialProduct?: {
+    name: string;
+    description?: string;
+    brand?: string;
+    imageSrc?: string;
+    category: string;
+    flavor: string;
+    format: string;
+    size: string;
+    aliases: string[];
+  };
+  mode?: "add" | "edit";
+  workspaceBrandName?: string;
 }
 
-export default function AddProductView({ onCancel, onSave }: AddProductViewProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [brand, setBrand] = useState("");
-  const [category, setCategory] = useState("Beverages");
-  const [flavor, setFlavor] = useState("");
-  const [format, setFormat] = useState("");
-  const [size, setSize] = useState("");
-  const [aliases, setAliases] = useState<string[]>([
-    "Kettle Chips",
-    "Kettle Sea Salt",
-    "Kettle 5oz",
-    "KET SS 5Z",
-  ]);
+export default function AddProductView({
+  onCancel,
+  onSave,
+  initialProduct,
+  mode = "add",
+  workspaceBrandName = "",
+}: AddProductViewProps) {
+  const defaultCategoryOptions = ["Beverages", "Snacks", "Pantry", "Confectionery"];
+  const initialCategory = initialProduct?.category || "Beverages";
+  const [name, setName] = useState(initialProduct?.name ?? "");
+  const [description, setDescription] = useState(initialProduct?.description ?? "");
+  const brand = workspaceBrandName || initialProduct?.brand || "";
+  const [imageSrc, setImageSrc] = useState(initialProduct?.imageSrc ?? "");
+  const [category, setCategory] = useState(initialCategory);
+  const [isCustomCategory, setIsCustomCategory] = useState(
+    Boolean(initialProduct?.category) &&
+      !defaultCategoryOptions.some(
+        (option) => option.toLowerCase() === initialCategory.toLowerCase()
+      )
+  );
+  const [flavor, setFlavor] = useState(initialProduct?.flavor ?? "");
+  const [format, setFormat] = useState(initialProduct?.format ?? "");
+  const [size, setSize] = useState(initialProduct?.size ?? "");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageError, setImageError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [aliases, setAliases] = useState<string[]>(initialProduct?.aliases ?? []);
   const [aliasInput, setAliasInput] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const categoryOptions = Array.from(
+    new Set([
+      ...defaultCategoryOptions,
+      !isCustomCategory && category ? category : "",
+    ].filter(Boolean))
+  );
+  const previewSrc = imagePreview || imageSrc;
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
+  const selectImageFile = (file?: File) => {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setImageError("Select a PNG or JPG image.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError("Image must be 5MB or smaller.");
+      return;
+    }
+
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    const previewUrl = URL.createObjectURL(file);
+    setImageFile(file);
+    setImagePreview(previewUrl);
+    setImageSrc(file.name);
+    setImageError("");
+  };
 
   const handleAddAlias = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,8 +108,24 @@ export default function AddProductView({ onCancel, onSave }: AddProductViewProps
   };
 
   const handleSave = async () => {
-    if (!name) return;
-    await onSave({ name, description, brand, category, flavor, format, size, aliases });
+    if (!name || isSaving) return;
+    setIsSaving(true);
+    try {
+      await onSave({
+        name,
+        description,
+        brand,
+        imageSrc,
+        category,
+        flavor,
+        format,
+        size,
+        aliases,
+        imageFile,
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -56,11 +136,11 @@ export default function AddProductView({ onCancel, onSave }: AddProductViewProps
           Product Library
         </button>
         <span className="text-slate-300">&gt;</span>
-        <span className="text-[#001BD2]">Add Product</span>
+        <span className="text-[#001BD2]">{mode === "edit" ? "Edit Product" : "Add Product"}</span>
       </div>
 
       <h1 className="text-3xl font-extrabold font-jakarta text-[#131B2E] tracking-tight">
-        Add New Product
+        {mode === "edit" ? "Edit Product" : "Add New Product"}
       </h1>
 
       <div className="flex flex-col lg:flex-row gap-8 items-start w-full">
@@ -79,20 +159,50 @@ export default function AddProductView({ onCancel, onSave }: AddProductViewProps
               <h2 className="text-base font-bold text-[#131B2E]">Product Identity</h2>
             </div>
 
-            {/* Drag & Drop mockup */}
-            <div className="border-2 border-dashed border-[#C5C5D9]/40 rounded-xl p-8 flex flex-col items-center justify-center gap-4 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              className="hidden"
+              onChange={(event) => selectImageFile(event.target.files?.[0])}
+            />
+            <div
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                selectImageFile(event.dataTransfer.files?.[0]);
+              }}
+              className="border-2 border-dashed border-[#C5C5D9]/40 rounded-xl p-8 flex flex-col items-center justify-center gap-4 bg-slate-50/50 hover:bg-slate-50 transition-colors"
+            >
               <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-sm flex-shrink-0">
-                <img
-                  src="/ProductLibary/dragAndDrop.svg"
-                  alt="Upload"
-                  className="w-6 h-6 object-contain"
-                />
+                {previewSrc ? (
+                  <img
+                    src={previewSrc}
+                    alt="Selected product"
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <img
+                    src="/ProductLibary/dragAndDrop.svg"
+                    alt="Upload"
+                    className="w-6 h-6 object-contain"
+                  />
+                )}
               </div>
               <div className="text-center font-manrope">
                 <p className="text-sm font-bold text-[#131B2E]">Drag and drop product imagery</p>
-                <p className="text-xs text-[#64748B] mt-1">High-resolution PNG or JPG. Max 5MB.</p>
+                <p className="text-xs text-[#64748B] mt-1">
+                  {imageFile ? imageFile.name : "High-resolution PNG or JPG. Max 5MB."}
+                </p>
               </div>
-              <button className="px-4 py-2 bg-[#E2E7FF] text-[#001BD2] text-xs font-bold rounded-lg hover:bg-blue-100 active:scale-[0.98] transition-all cursor-pointer">
+              {imageError && (
+                <p className="text-xs font-semibold text-[#BA1A1A]">{imageError}</p>
+              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 bg-[#E2E7FF] text-[#001BD2] text-xs font-bold rounded-lg hover:bg-blue-100 active:scale-[0.98] transition-all cursor-pointer"
+              >
                 Browse Files
               </button>
             </div>
@@ -141,23 +251,53 @@ export default function AddProductView({ onCancel, onSave }: AddProductViewProps
                 <input
                   type="text"
                   value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  placeholder="Select or enter brand"
-                  className="w-full h-11 bg-white border border-slate-200/80 rounded-xl px-4 text-sm focus:outline-none focus:border-[#001BD2] text-slate-800 placeholder-slate-400 shadow-inner"
+                  readOnly
+                  aria-readonly="true"
+                  title="Products belong to the selected brand workspace."
+                  placeholder="Current brand workspace"
+                  className="w-full h-11 bg-slate-50 border border-slate-200/80 rounded-xl px-4 text-sm text-slate-700 placeholder-slate-400 shadow-inner cursor-not-allowed"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-[#454656] uppercase tracking-wider">CATEGORY</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full h-11 bg-white border border-slate-200/80 rounded-xl px-4 text-sm focus:outline-none focus:border-[#001BD2] text-slate-800 shadow-inner"
-                >
-                  <option>Beverages</option>
-                  <option>Snacks</option>
-                  <option>Pantry</option>
-                  <option>Confectionery</option>
-                </select>
+                {isCustomCategory ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      placeholder="Write exact category"
+                      className="min-w-0 flex-1 h-11 bg-white border border-slate-200/80 rounded-xl px-4 text-sm focus:outline-none focus:border-[#001BD2] text-slate-800 placeholder-slate-400 shadow-inner"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomCategory(false);
+                      }}
+                      className="h-11 px-4 bg-[#E2E7FF] text-[#001BD2] text-xs font-bold rounded-xl hover:bg-blue-100 active:scale-[0.98] transition-all cursor-pointer"
+                    >
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={category}
+                    onChange={(e) => {
+                      if (e.target.value === "__other__") {
+                        setCategory("");
+                        setIsCustomCategory(true);
+                        return;
+                      }
+                      setCategory(e.target.value);
+                    }}
+                    className="w-full h-11 bg-white border border-slate-200/80 rounded-xl px-4 text-sm focus:outline-none focus:border-[#001BD2] text-slate-800 shadow-inner"
+                  >
+                    {categoryOptions.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                    <option value="__other__">Others</option>
+                  </select>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-[#454656] uppercase tracking-wider">FLAVOR</label>
@@ -226,10 +366,10 @@ export default function AddProductView({ onCancel, onSave }: AddProductViewProps
           <div className="flex flex-col gap-3 w-full">
             <button
               onClick={handleSave}
-              disabled={!name}
-              className={`flex items-center justify-center w-full h-[52px] rounded-full text-white font-bold text-sm bg-[#001BD2] hover:bg-blue-700 transition-colors shadow-md active:scale-[0.98] ${!name ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+              disabled={!name || isSaving}
+              className={`flex items-center justify-center w-full h-[52px] rounded-full text-white font-bold text-sm bg-[#001BD2] hover:bg-blue-700 transition-colors shadow-md active:scale-[0.98] ${!name || isSaving ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
             >
-              Save Product
+              {isSaving ? "Saving..." : mode === "edit" ? "Save Changes" : "Save Product"}
             </button>
             <button onClick={onCancel} className="flex items-center justify-center w-full h-[52px] rounded-full bg-[#E2E7FF] text-[#001BD2] font-bold text-sm hover:bg-blue-100 transition-colors active:scale-[0.98] cursor-pointer">
               Cancel

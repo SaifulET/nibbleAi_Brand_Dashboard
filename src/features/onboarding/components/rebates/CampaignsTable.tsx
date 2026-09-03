@@ -1,9 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { useMemo, useState } from "react";
 import { ApiRecord } from "@/lib/api/backendApi";
 import { useBrandApiStore } from "@/stores/useBrandApiStore";
 import { formatInteger, formatMoney, titleCase, toNumber } from "../../utils/backendMappers";
+
+type CampaignTypeFilter = "All Types" | "Rebate" | "Review";
+type CampaignDateFilter = "Last 30 Days" | "Last 90 Days" | "All Time";
 
 type DashboardCampaign = {
   id: string;
@@ -14,6 +18,7 @@ type DashboardCampaign = {
   activity: string;
   activitySub: string;
   thumbnail: string;
+  timestamp: number | null;
 };
 
 const campaignId = (campaign: ApiRecord) =>
@@ -21,43 +26,101 @@ const campaignId = (campaign: ApiRecord) =>
 
 const statusText = (status: unknown) => titleCase(status || "draft");
 
+const campaignTimestamp = (campaign: ApiRecord) => {
+  const rawDate =
+    campaign.created_at ??
+    campaign.start_at ??
+    campaign.updated_at ??
+    campaign.createdAt ??
+    campaign.startAt;
+  if (typeof rawDate !== "string" || !rawDate) return null;
+  const timestamp = new Date(rawDate).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+};
+
 export default function CampaignsTable() {
+  const [typeFilter, setTypeFilter] = useState<CampaignTypeFilter>("All Types");
+  const [dateFilter, setDateFilter] = useState<CampaignDateFilter>("Last 30 Days");
+  const [showTypeFilter, setShowTypeFilter] = useState(false);
+  const [showDateFilter, setShowDateFilter] = useState(false);
+  const [showAllRows, setShowAllRows] = useState(false);
   const campaigns = useBrandApiStore((state) => state.campaigns);
   const reviewCampaigns = useBrandApiStore((state) => state.reviewCampaigns);
   const analyticsCampaigns = useBrandApiStore((state) => state.analyticsCampaigns);
-  const analyticsByCampaign = new Map(
-    analyticsCampaigns.map((row) => [String(row.campaign_id), row])
-  );
-  const rows: DashboardCampaign[] = [
-    ...campaigns.map((campaign) => {
-      const metrics = analyticsByCampaign.get(campaignId(campaign));
-      const redemptions = toNumber(metrics?.redemptions);
-      const approvals = toNumber(metrics?.approvals);
-      return {
+  const [now] = useState(() => Date.now());
+
+  const rows: DashboardCampaign[] = useMemo(() => {
+    const analyticsByCampaign = new Map(
+      analyticsCampaigns.map((row) => [String(row.campaign_id), row])
+    );
+
+    return [
+      ...campaigns.map((campaign) => {
+        const metrics = analyticsByCampaign.get(campaignId(campaign));
+        const redemptions = toNumber(metrics?.redemptions);
+        const approvals = toNumber(metrics?.approvals);
+        return {
+          id: campaignId(campaign),
+          name: String(campaign.name ?? "Untitled rebate campaign"),
+          type: "REBATE" as const,
+          status: statusText(campaign.status),
+          spend: toNumber(metrics?.total_spend),
+          activity: `${formatInteger(approvals)} Purchases`,
+          activitySub: `${formatInteger(redemptions)} Redemptions`,
+          thumbnail: "/Auth/rebateImage.svg",
+          timestamp: campaignTimestamp(campaign),
+        };
+      }),
+      ...reviewCampaigns.map((campaign) => ({
         id: campaignId(campaign),
-        name: String(campaign.name ?? "Untitled rebate campaign"),
-        type: "REBATE" as const,
+        name: String(campaign.name ?? "Untitled review campaign"),
+        type: "REVIEW" as const,
         status: statusText(campaign.status),
-        spend: toNumber(metrics?.total_spend),
-        activity: `${formatInteger(approvals)} Purchases`,
-        activitySub: `${formatInteger(redemptions)} Redemptions`,
-        thumbnail: "/Auth/rebateImage.svg",
-      };
-    }),
-    ...reviewCampaigns.map((campaign) => ({
-      id: campaignId(campaign),
-      name: String(campaign.name ?? "Untitled review campaign"),
-      type: "REVIEW" as const,
-      status: statusText(campaign.status),
-      spend: toNumber(campaign.daily_budget),
-      activity: `${formatInteger(campaign.prompts instanceof Array ? campaign.prompts.length : 0)} Prompts`,
-      activitySub: `${formatMoney(campaign.reward_amount)} Reward`,
-      thumbnail: "/Auth/reviewImage.svg",
-    })),
-  ].filter((campaign) => campaign.id);
-  const activeRows = rows
-    .filter((campaign) => campaign.status.toLowerCase() === "active")
-    .slice(0, 5);
+        spend: toNumber(campaign.daily_budget),
+        activity: `${formatInteger(campaign.prompts instanceof Array ? campaign.prompts.length : 0)} Prompts`,
+        activitySub: `${formatMoney(campaign.reward_amount)} Reward`,
+        thumbnail: "/Auth/reviewImage.svg",
+        timestamp: campaignTimestamp(campaign),
+      })),
+    ].filter((campaign) => campaign.id);
+  }, [analyticsCampaigns, campaigns, reviewCampaigns]);
+
+  const activeRows = useMemo(() => {
+    const dateWindow =
+      dateFilter === "Last 30 Days"
+        ? 30 * 24 * 60 * 60 * 1000
+        : dateFilter === "Last 90 Days"
+          ? 90 * 24 * 60 * 60 * 1000
+          : null;
+
+    return rows.filter((campaign) => {
+      const matchesStatus = campaign.status.toLowerCase() === "active";
+      const matchesType =
+        typeFilter === "All Types" || campaign.type === typeFilter.toUpperCase();
+      const matchesDate =
+        dateWindow === null ||
+        campaign.timestamp === null ||
+        campaign.timestamp >= now - dateWindow;
+
+      return matchesStatus && matchesType && matchesDate;
+    });
+  }, [dateFilter, now, rows, typeFilter]);
+
+  const visibleRows = showAllRows ? activeRows : activeRows.slice(0, 5);
+  const typeOptions: CampaignTypeFilter[] = ["All Types", "Rebate", "Review"];
+  const dateOptions: CampaignDateFilter[] = ["Last 30 Days", "Last 90 Days", "All Time"];
+
+  const selectTypeFilter = (value: CampaignTypeFilter) => {
+    setTypeFilter(value);
+    setShowTypeFilter(false);
+    setShowAllRows(false);
+  };
+
+  const selectDateFilter = (value: CampaignDateFilter) => {
+    setDateFilter(value);
+    setShowDateFilter(false);
+    setShowAllRows(false);
+  };
 
   return (
     <section className="flex flex-col gap-6">
@@ -68,14 +131,65 @@ export default function CampaignsTable() {
 
         {/* Dropdowns Filters */}
         <div className="flex items-center gap-4">
-          <button className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#C5C5D9]/20 rounded-lg text-xs font-bold text-[#454656] cursor-pointer hover:bg-slate-50">
-            <span>All Types</span>
-            <span className="text-[10px]">▼</span>
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#C5C5D9]/20 rounded-lg text-xs font-bold text-[#454656] cursor-pointer hover:bg-slate-50">
-            <span>Last 30 Days</span>
-            <span className="text-[10px]">▼</span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowTypeFilter((value) => !value);
+                setShowDateFilter(false);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#C5C5D9]/20 rounded-lg text-xs font-bold text-[#454656] cursor-pointer hover:bg-slate-50"
+            >
+              <span>{typeFilter}</span>
+              <span className="text-[10px]">v</span>
+            </button>
+            {showTypeFilter && (
+              <div className="absolute right-0 mt-2 w-36 bg-white border border-slate-200 shadow-lg rounded-xl py-1 z-30">
+                {typeOptions.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => selectTypeFilter(option)}
+                    className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 border-none bg-transparent cursor-pointer ${
+                      typeFilter === option ? "text-[#001BD2]" : "text-[#131B2E]"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowDateFilter((value) => !value);
+                setShowTypeFilter(false);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#C5C5D9]/20 rounded-lg text-xs font-bold text-[#454656] cursor-pointer hover:bg-slate-50"
+            >
+              <span>{dateFilter}</span>
+              <span className="text-[10px]">v</span>
+            </button>
+            {showDateFilter && (
+              <div className="absolute right-0 mt-2 w-40 bg-white border border-slate-200 shadow-lg rounded-xl py-1 z-30">
+                {dateOptions.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => selectDateFilter(option)}
+                    className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 border-none bg-transparent cursor-pointer ${
+                      dateFilter === option ? "text-[#001BD2]" : "text-[#131B2E]"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -92,7 +206,7 @@ export default function CampaignsTable() {
             </tr>
           </thead>
           <tbody>
-            {activeRows.map((row) => (
+            {visibleRows.map((row) => (
               <tr key={`${row.type}-${row.id}`} className="h-[88.5px] border-b border-[#C5C5D9]/5 hover:bg-slate-50/50 transition-colors">
                 <td className="px-8">
                   <div className="flex items-center gap-3">
@@ -143,10 +257,10 @@ export default function CampaignsTable() {
                 </td>
               </tr>
             ))}
-            {activeRows.length === 0 && (
+            {visibleRows.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-8 py-12 text-center text-sm font-semibold text-slate-400">
-                  No active campaigns yet.
+                  No active campaigns match the selected filters.
                 </td>
               </tr>
             )}
@@ -156,10 +270,15 @@ export default function CampaignsTable() {
         {/* Table Footer */}
         <div className="flex justify-between items-center px-8 py-4 bg-[#F2F3FF] border-t border-[#C5C5D9]/5">
           <span className="text-[10px] font-manrope font-bold text-[#454656] tracking-wider uppercase">
-            SHOWING {activeRows.length} OF {rows.length} CAMPAIGNS
+            SHOWING {visibleRows.length} OF {activeRows.length} ACTIVE CAMPAIGNS
           </span>
-          <button className="font-manrope font-bold text-xs text-[#001BD2] hover:underline cursor-pointer">
-            See All Activity
+          <button
+            type="button"
+            onClick={() => setShowAllRows((value) => !value)}
+            disabled={activeRows.length <= 5}
+            className="font-manrope font-bold text-xs text-[#001BD2] hover:underline cursor-pointer disabled:cursor-not-allowed disabled:text-[#454656]/40 disabled:no-underline"
+          >
+            {showAllRows ? "Show Less" : "See All Activity"}
           </button>
         </div>
       </div>

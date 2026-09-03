@@ -1,46 +1,90 @@
 /* eslint-disable @next/next/no-img-element */
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 interface CreateCampaignStep1Props {
   onCancel: () => void;
-  onContinue: (data: { name: string; startDate: string; endDate: string; isActive: boolean }) => void;
-  initialData: { name: string; startDate: string; endDate: string; isActive: boolean };
+  onContinue: (data: {
+    name: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+    imageSrc: string;
+  }) => void;
+  initialData: {
+    name: string;
+    description?: string;
+    startDate: string;
+    endDate: string;
+    isActive: boolean;
+    imageSrc?: string;
+  };
+  mode?: "create" | "edit";
 }
 
-export default function CreateCampaignStep1({ onCancel, onContinue, initialData }: CreateCampaignStep1Props) {
+export default function CreateCampaignStep1({
+  onCancel,
+  onContinue,
+  initialData,
+  mode = "create",
+}: CreateCampaignStep1Props) {
   const [name, setName] = useState(initialData.name);
-  const [startDate, setStartDate] = useState(initialData.startDate || "2024-06-01");
-  const [endDate, setEndDate] = useState(initialData.endDate || "2024-08-31");
+  const [description, setDescription] = useState(initialData.description || "");
+  const [startDate, setStartDate] = useState(initialData.startDate || "");
+  const [endDate, setEndDate] = useState(initialData.endDate || "");
   const [isActive, setIsActive] = useState(initialData.isActive);
+  const [imageSrc, setImageSrc] = useState(initialData.imageSrc || "/Rebate/bannerPreviewImage.svg");
+  const [imageError, setImageError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const selectCreativeFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setImageError("Select an image file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError("Image must be 5MB or smaller.");
+      return;
+    }
+    if (imageSrc.startsWith("blob:")) URL.revokeObjectURL(imageSrc);
+    setImageSrc(URL.createObjectURL(file));
+    setImageError("");
+  };
 
   const handleContinue = () => {
     if (!name) return;
-    onContinue({ name, startDate, endDate, isActive });
+    onContinue({ name, description, startDate, endDate, isActive, imageSrc });
   };
 
   return (
     <div className="flex flex-col gap-8 w-full animate-slide-up text-left">
       {/* Stepper indicators header */}
-      <div className="flex justify-between items-center w-full max-w-[800px] mx-auto font-manrope font-semibold border-b border-slate-100 pb-4">
+      <div className="relative grid grid-cols-4 items-start gap-2 w-full max-w-[920px] mx-auto font-manrope font-semibold border-b border-slate-100 py-3">
+        <div className="absolute left-[12.5%] right-[12.5%] top-[31px] h-[2px] bg-[#EAEDFF]"></div>
         {[
           { step: "1", title: "Basic Info", active: true },
           { step: "2", title: "Products", active: false },
           { step: "3", title: "Budget & Offers", active: false },
           { step: "4", title: "Review & publish", active: false },
         ].map((s) => (
-          <div key={s.step} className="flex items-center gap-2">
-            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-              s.active ? "bg-[#001BD2] text-white" : "bg-slate-200 text-[#454656]"
+          <div key={s.step} className="relative z-10 flex flex-col items-center gap-2 min-w-0">
+            <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+              s.active ? "bg-[#001BD2] text-white shadow-[0_0_0_8px_#DFE0FF]" : "bg-[#DAE2FD] text-[#454656]"
             }`}>{s.step}</span>
-            <span className={s.active ? "text-[#001BD2] text-xs" : "text-slate-400 text-xs"}>{s.title}</span>
+            <span className={s.active ? "text-[#001BD2] text-xs text-center" : "text-slate-400 text-xs text-center"}>{s.title}</span>
           </div>
         ))}
       </div>
 
       <div>
-        <h2 className="text-3xl font-extrabold font-jakarta text-[#131B2E] tracking-tight">Campaign Fundamentals</h2>
+        <h2 className="text-3xl font-extrabold font-jakarta text-[#131B2E] tracking-tight">
+          {mode === "edit" ? "Edit Campaign" : "Campaign Fundamentals"}
+        </h2>
         <p className="text-xs text-[#64748B] font-medium leading-normal mt-2">
-          Define the core identity and scheduling for your new rebate campaign. This data will be used to track performance and anchor your creative assets.
+          {mode === "edit"
+            ? "Update this campaign's identity, schedule, and active state."
+            : "Define the core identity and scheduling for your new rebate campaign. This data will be used to track performance and anchor your creative assets."}
         </p>
       </div>
 
@@ -74,6 +118,17 @@ export default function CreateCampaignStep1({ onCancel, onContinue, initialData 
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Summer Cashback Rewards 2024"
                 className="w-full h-11 bg-white border border-slate-200/80 rounded-xl px-4 text-sm focus:outline-none focus:border-[#001BD2] text-slate-800 placeholder-[#757688] shadow-inner"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-[#454656] uppercase tracking-wider">CAMPAIGN DESCRIPTION</label>
+              <textarea
+                rows={4}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe the campaign offer, audience, or internal notes..."
+                className="w-full bg-white border border-slate-200/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#001BD2] text-slate-800 placeholder-[#757688] shadow-inner resize-none"
               />
             </div>
 
@@ -114,10 +169,24 @@ export default function CreateCampaignStep1({ onCancel, onContinue, initialData 
             <span className="bg-red-50 text-[#BA1A1A] text-[9px] font-bold px-2 py-0.5 rounded">REQD</span>
           </div>
 
-          <div className="border-2 border-dashed border-[#C5C5D9]/40 rounded-xl p-5 flex flex-col items-center justify-center gap-4 bg-slate-50/50 hover:bg-slate-50 transition-colors w-full">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            className="hidden"
+            onChange={(event) => selectCreativeFile(event.target.files?.[0])}
+          />
+          <div
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              selectCreativeFile(event.dataTransfer.files?.[0]);
+            }}
+            className="border-2 border-dashed border-[#C5C5D9]/40 rounded-xl p-5 flex flex-col items-center justify-center gap-4 bg-slate-50/50 hover:bg-slate-50 transition-colors w-full"
+          >
             <div className="w-full h-[100px] bg-white rounded-lg flex items-center justify-center border border-slate-100 overflow-hidden relative flex-shrink-0">
               <img
-                src="/Rebate/bannerPreviewImage.svg"
+                src={imageSrc}
                 alt="Banner Preview"
                 className="w-full h-full object-cover"
               />
@@ -126,7 +195,14 @@ export default function CreateCampaignStep1({ onCancel, onContinue, initialData 
               <p className="text-xs font-bold text-[#131B2E]">Drag & Drop Visuals</p>
               <p className="text-[10px] text-[#64748B] mt-1 leading-normal">Recommended size: 1200x400px. PNG, JPG or WebP formats accepted.</p>
             </div>
-            <button className="px-4 py-2 bg-[#E2E7FF] text-[#001BD2] text-xs font-bold rounded-lg hover:bg-blue-100 active:scale-[0.98] transition-all cursor-pointer">Browse Files</button>
+            {imageError && <p className="text-[10px] font-bold text-[#BA1A1A]">{imageError}</p>}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-4 py-2 bg-[#E2E7FF] text-[#001BD2] text-xs font-bold rounded-lg hover:bg-blue-100 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              Browse Files
+            </button>
           </div>
         </div>
       </div>

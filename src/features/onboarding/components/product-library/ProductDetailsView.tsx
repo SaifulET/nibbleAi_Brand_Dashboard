@@ -1,29 +1,118 @@
 /* eslint-disable @next/next/no-img-element */
+"use client";
+
+import { useMemo } from "react";
+import { ApiRecord } from "@/lib/api/backendApi";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
+import { formatDate, formatInteger, formatMoney, toNumber } from "../../utils/backendMappers";
+
 interface Product {
   id: string;
   name: string;
+  description?: string;
+  brand?: string;
   imageSrc: string;
   category: string;
   flavor: string;
   format: string;
   size: string;
+  sku?: string;
   aliases: string[];
   activeCampaigns: number;
 }
 interface ProductDetailsProps {
   product: Product;
   onBack: () => void;
+  onEditProduct: (prod: Product) => void | Promise<void>;
   onEditAliases: (prod: Product) => void | Promise<void>;
   onDelete: (prodId: string) => void;
+  onViewAllCampaigns: (type: "REBATE" | "REVIEW") => void;
 }
-export default function ProductDetailsView({ product, onBack, onEditAliases, onDelete }: ProductDetailsProps) {
+
+const campaignId = (campaign: ApiRecord) =>
+  String(campaign.id ?? campaign.campaign_id ?? "");
+
+const productIdsForCampaign = (campaign: ApiRecord) => {
+  const rawProducts = campaign.products ?? campaign.product ?? campaign.product_ids;
+  const products = Array.isArray(rawProducts) ? rawProducts : rawProducts ? [rawProducts] : [];
+
+  return new Set(
+    products
+      .map((item) => {
+        if (item && typeof item === "object" && "id" in item) {
+          return String((item as { id: unknown }).id);
+        }
+        return String(item || "");
+      })
+      .filter(Boolean)
+  );
+};
+
+const isActiveCampaign = (campaign: ApiRecord) =>
+  String(campaign.status ?? "").toLowerCase() === "active";
+
+export default function ProductDetailsView({
+  product,
+  onBack,
+  onEditProduct,
+  onEditAliases,
+  onDelete,
+  onViewAllCampaigns,
+}: ProductDetailsProps) {
+  const campaigns = useBrandApiStore((state) => state.campaigns);
+  const reviewCampaigns = useBrandApiStore((state) => state.reviewCampaigns);
+  const analyticsCampaigns = useBrandApiStore((state) => state.analyticsCampaigns);
+  const relatedCampaigns = useMemo(() => {
+    const analyticsByCampaign = new Map(
+      analyticsCampaigns.map((row) => [String(row.campaign_id), row])
+    );
+    const rebateRows = campaigns
+      .filter((campaign) => isActiveCampaign(campaign) && productIdsForCampaign(campaign).has(product.id))
+      .map((campaign) => {
+        const metrics = analyticsByCampaign.get(campaignId(campaign));
+        const approvals = toNumber(metrics?.approvals);
+        const redemptions = toNumber(metrics?.redemptions);
+        return {
+          id: campaignId(campaign),
+          name: String(campaign.name ?? "Untitled rebate campaign"),
+          type: "REBATE" as const,
+          subText: campaign.end_at ? `Ends ${formatDate(campaign.end_at)}` : "No expiration",
+          metricLabel: "Participation",
+          metricValue: `${formatInteger(approvals)} Purchases`,
+          progress: Math.min(100, approvals ? Math.round((redemptions / approvals) * 100) : 0),
+          iconSrc: "/ProductLibary/rebateIcon.svg",
+          badgeClass: "bg-blue-50 text-[#001BD2]",
+          barClass: "bg-[#001BD2]",
+        };
+      });
+
+    const reviewRows = reviewCampaigns
+      .filter((campaign) => isActiveCampaign(campaign) && productIdsForCampaign(campaign).has(product.id))
+      .map((campaign) => {
+        const promptCount = Array.isArray(campaign.prompts) ? campaign.prompts.length : 0;
+        return {
+          id: campaignId(campaign),
+          name: String(campaign.name ?? "Untitled review campaign"),
+          type: "REVIEW" as const,
+          subText: "No expiration",
+          metricLabel: "Reward",
+          metricValue: `${formatMoney(campaign.reward_amount)} Reward`,
+          progress: Math.min(100, promptCount * 20),
+          iconSrc: "/ProductLibary/VerifyReview].svg",
+          badgeClass: "bg-emerald-50 text-[#059669]",
+          barClass: "bg-[#004956]",
+        };
+      });
+
+    return [...rebateRows, ...reviewRows];
+  }, [analyticsCampaigns, campaigns, product.id, reviewCampaigns]);
   const specs = [
     { label: "Category", val: product.category },
-    { label: "Brand", val: "Kettle" },
+    { label: "Brand", val: product.brand || "Not set" },
     { label: "Flavor", val: product.flavor },
     { label: "Format", val: product.format },
     { label: "Size", val: product.size },
-    { label: "SKU", val: `KET-SS-${product.id}0Z-01` },
+    { label: "SKU", val: product.sku || product.format || product.id },
   ];
   return (
     <div className="flex flex-col gap-8 w-full animate-slide-up">
@@ -43,7 +132,7 @@ export default function ProductDetailsView({ product, onBack, onEditAliases, onD
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => onDelete(product.id)} className="px-6 h-11 bg-[#001BD2] hover:bg-blue-700 text-white font-bold text-sm rounded-full transition-colors active:scale-[0.98] cursor-pointer">Delete</button>
-          <button onClick={() => onEditAliases(product)} className="px-6 h-11 bg-white hover:bg-slate-50 text-[#001BD2] border border-[#001BD2]/20 font-bold text-sm rounded-full transition-colors active:scale-[0.98] cursor-pointer flex items-center gap-2">
+          <button onClick={() => onEditProduct(product)} className="px-6 h-11 bg-white hover:bg-slate-50 text-[#001BD2] border border-[#001BD2]/20 font-bold text-sm rounded-full transition-colors active:scale-[0.98] cursor-pointer flex items-center gap-2">
             <img src="/ProductLibary/editIcon.svg" alt="Edit" className="w-[14px] h-[14px] object-contain" />Edit Product
           </button>
         </div>
@@ -53,11 +142,19 @@ export default function ProductDetailsView({ product, onBack, onEditAliases, onD
         {/* Left Column */}
         <div className="flex-grow flex flex-col gap-6 w-full lg:max-w-[60%]">
           {/* Visual Image Card */}
-          <div className="bg-white border border-slate-100 rounded-[20px] shadow-sm overflow-hidden relative w-full h-[360px] md:h-[420px] flex items-center justify-center p-6 bg-gradient-to-b from-slate-50 to-white">
-            <img src={product.imageSrc} alt={product.name} className="max-h-full max-w-full object-contain" />
-            <div className="absolute left-6 bottom-6 flex flex-col gap-2 items-start">
-              <span className="bg-slate-800/40 backdrop-blur-sm text-white text-[10px] font-bold px-3 py-1 rounded uppercase tracking-wider">BEST SELLER</span>
-              <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">Premium {product.flavor || "Product"} Variant</h2>
+          <div className="bg-white border border-slate-100 rounded-[20px] shadow-sm overflow-hidden w-full h-[420px] md:h-[460px] grid grid-rows-[minmax(0,1fr)_auto]">
+            <div className="min-h-0 w-full bg-gradient-to-b from-slate-50 to-white flex items-center justify-center p-6">
+              <img
+                src={product.imageSrc}
+                alt={product.name}
+                className="block max-h-full max-w-full object-contain"
+              />
+            </div>
+            <div className="border-t border-slate-100 bg-white px-6 py-4 flex flex-col gap-2 items-start">
+              <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-3 py-1 rounded uppercase tracking-wider">BEST SELLER</span>
+              <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight leading-snug">
+                Premium {product.flavor || "Product"} Variant
+              </h2>
             </div>
           </div>
           {/* Product Description */}
@@ -67,7 +164,8 @@ export default function ProductDetailsView({ product, onBack, onEditAliases, onD
               <span>Product Description</span>
             </div>
             <p className="text-sm font-manrope text-[#454656] leading-[1.62] font-medium">
-              Our {product.name} is crafted with a dedication to simplicity and quality. Each batch is carefully processed to ensure the perfect quality and premium texture. Using only clean, high-quality ingredients, we deliver a timeless snacking and lifestyle experience for customers.
+              {product.description ||
+                `Our ${product.name} is crafted with a dedication to simplicity and quality. Each batch is carefully processed to ensure the perfect quality and premium texture. Using only clean, high-quality ingredients, we deliver a timeless snacking and lifestyle experience for customers.`}
             </p>
           </div>
           {/* Technical Specifications */}
@@ -92,51 +190,50 @@ export default function ProductDetailsView({ product, onBack, onEditAliases, onD
           <div className="bg-white border border-slate-100 rounded-[20px] p-6 shadow-sm flex flex-col gap-6 w-full">
             <div className="flex justify-between items-center">
               <h2 className="text-base font-bold text-[#131B2E]">Active Campaigns</h2>
-              <button className="text-xs font-bold text-[#001BD2] hover:underline cursor-pointer">View All</button>
+              <button
+                type="button"
+                onClick={() => onViewAllCampaigns(relatedCampaigns[0]?.type ?? "REBATE")}
+                disabled={relatedCampaigns.length === 0}
+                className="text-xs font-bold text-[#001BD2] hover:underline cursor-pointer disabled:cursor-not-allowed disabled:text-slate-300 disabled:no-underline"
+              >
+                View All
+              </button>
             </div>
             <div className="flex flex-col gap-5">
-              {/* Campaign 1 */}
-              <div className="border border-slate-100 p-4 rounded-xl flex flex-col gap-3 font-manrope bg-[#FAF8FF]">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-[#E2E7FF] flex items-center justify-center flex-shrink-0">
-                      <img src="/ProductLibary/rebateIcon.svg" alt="Rebate" className="w-[18px] h-[18px] object-contain" />
+              {relatedCampaigns.slice(0, 3).map((campaign) => (
+                <div key={`${campaign.type}-${campaign.id}`} className="border border-slate-100 p-4 rounded-xl flex flex-col gap-3 font-manrope bg-[#FAF8FF]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-[#E2E7FF] flex items-center justify-center flex-shrink-0">
+                        <img src={campaign.iconSrc} alt={campaign.type} className="w-[18px] h-[18px] object-contain" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-[#131B2E] truncate">{campaign.name}</span>
+                        <span className="text-[10px] text-[#64748B] font-medium">{campaign.subText}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-[#131B2E]">Summer BBQ Rebate</span>
-                      <span className="text-[10px] text-[#64748B] font-medium">Expires in 12 days</span>
-                    </div>
+                    <span className={`${campaign.badgeClass} text-[9px] font-bold px-2 py-0.5 rounded`}>
+                      {campaign.type}
+                    </span>
                   </div>
-                  <span className="bg-blue-50 text-[#001BD2] text-[9px] font-bold px-2 py-0.5 rounded">REBATE</span>
-                </div>
-                <div className="flex justify-between items-center text-xs font-semibold text-[#454656] pt-1">
-                  <span>Participation</span><span className="text-[#131B2E] font-bold">4,203 Claims</span>
-                </div>
-                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden relative">
-                  <div className="absolute left-0 top-0 bottom-0 bg-[#001BD2] rounded-full w-[80%]"></div>
-                </div>
-              </div>
-              {/* Campaign 2 */}
-              <div className="border border-slate-100 p-4 rounded-xl flex flex-col gap-3 font-manrope bg-[#FAF8FF]">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-[#E2E7FF] flex items-center justify-center flex-shrink-0">
-                      <img src="/ProductLibary/VerifyReview].svg" alt="Review" className="w-[18px] h-[18px] object-contain" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-[#131B2E]">Verified Review Push</span>
-                      <span className="text-[10px] text-[#64748B] font-medium">No expiration</span>
-                    </div>
+                  <div className="flex justify-between items-center gap-4 text-xs font-semibold text-[#454656] pt-1">
+                    <span>{campaign.metricLabel}</span>
+                    <span className="text-[#131B2E] font-bold">{campaign.metricValue}</span>
                   </div>
-                  <span className="bg-emerald-50 text-[#059669] text-[9px] font-bold px-2 py-0.5 rounded">REVIEW</span>
+                  <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden relative">
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 ${campaign.barClass} rounded-full`}
+                      style={{ width: `${campaign.progress}%` }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center text-xs font-semibold text-[#454656] pt-1">
-                  <span>Avg. Stars</span><span className="text-[#131B2E] font-bold">4.9 / 5.0</span>
+              ))}
+              {relatedCampaigns.length === 0 && (
+                <div className="border border-dashed border-slate-200 p-6 rounded-xl text-center font-manrope bg-[#FAF8FF]">
+                  <p className="text-sm font-bold text-[#131B2E]">No active campaigns</p>
+                  <p className="text-xs text-[#64748B] mt-1">This product is not attached to an active campaign yet.</p>
                 </div>
-                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden relative">
-                  <div className="absolute left-0 top-0 bottom-0 bg-[#004956] rounded-full w-[95%]"></div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
           {/* OCR Aliases */}

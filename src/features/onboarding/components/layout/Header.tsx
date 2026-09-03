@@ -1,5 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 import { useState } from "react";
+import { LogOut, Settings, UserRound } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useBrandApiStore } from "@/stores/useBrandApiStore";
 
 interface NotificationItem {
   id: string;
@@ -19,6 +22,7 @@ interface HeaderProps {
   userName?: string;
   userRole?: string;
   avatarUrl?: string;
+  onOpenProfile?: () => void;
 }
 
 export default function Header({
@@ -29,8 +33,17 @@ export default function Header({
   userName = "Brand user",
   userRole = "brand",
   avatarUrl,
+  onOpenProfile,
 }: HeaderProps) {
+  const router = useRouter();
+  const logout = useBrandApiStore((state) => state.logout);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/login");
+  };
 
   return (
     <header className="w-full h-20 bg-[#FAF8FF] border-b border-[#000000]/10 flex items-center justify-between px-4 md:px-8 sticky top-0 z-20">
@@ -58,7 +71,10 @@ export default function Header({
       <div className="flex items-center gap-6 relative">
         {/* Notification Bell Button */}
         <button
-          onClick={() => setShowNotifications(!showNotifications)}
+          onClick={() => {
+            setShowNotifications(!showNotifications);
+            setShowProfileMenu(false);
+          }}
           className="relative p-2 rounded-full hover:bg-slate-100/80 transition-colors cursor-pointer text-slate-600 flex items-center justify-center"
         >
           <img
@@ -85,7 +101,16 @@ export default function Header({
         <div className="w-[1px] h-8 bg-[#C5C5D9]/15"></div>
 
         {/* User Profile */}
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setShowProfileMenu(!showProfileMenu);
+            setShowNotifications(false);
+          }}
+          className="flex items-center gap-3 rounded-2xl px-2 py-1.5 hover:bg-white/80 transition-colors cursor-pointer"
+          aria-haspopup="menu"
+          aria-expanded={showProfileMenu}
+        >
           <div className="flex flex-col items-end font-manrope">
             <span className="text-xs font-bold text-[#131B2E] leading-none">
               {userName}
@@ -101,7 +126,52 @@ export default function Header({
               className="w-full h-full object-cover"
             />
           </div>
-        </div>
+        </button>
+
+        {showProfileMenu && (
+          <div
+            role="menu"
+            className="absolute right-0 top-14 w-56 bg-white shadow-[0px_0px_0px_1px_rgba(197,197,217,0.1),0px_24px_48px_rgba(19,27,46,0.1)] rounded-2xl z-50 overflow-hidden animate-slide-up font-manrope"
+          >
+            <div className="px-4 py-3 bg-[#F2F3FF] border-b border-[#C5C5D9]/10">
+              <p className="text-xs font-extrabold text-[#131B2E] truncate">{userName}</p>
+              <p className="text-[10px] font-semibold text-[#454656] mt-0.5">{userRole}</p>
+            </div>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onOpenProfile?.();
+                setShowProfileMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left text-xs font-bold text-[#131B2E] hover:bg-[#F2F3FF] transition-colors cursor-pointer"
+            >
+              <UserRound className="w-4 h-4 text-[#001BD2]" />
+              Profile
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onOpenProfile?.();
+                setShowProfileMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left text-xs font-bold text-[#131B2E] hover:bg-[#F2F3FF] transition-colors cursor-pointer"
+            >
+              <Settings className="w-4 h-4 text-[#001BD2]" />
+              Settings
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left text-xs font-bold text-[#BA1A1A] hover:bg-red-50 transition-colors cursor-pointer border-t border-[#C5C5D9]/10"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        )}
 
         {/* Notifications Dropdown Panel */}
         {showNotifications && (

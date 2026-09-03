@@ -353,6 +353,11 @@ export const backendApi = {
       path: `/brands/${brandId}/campaigns/${campaignId}/`,
       auth: true,
     }),
+    updateCampaign: (brandId: string, campaignId: string): ApiEndpoint => ({
+      method: "PATCH",
+      path: `/brands/${brandId}/campaigns/${campaignId}/`,
+      auth: true,
+    }),
     campaignTiers: (brandId: string, campaignId: string): ApiEndpoint => ({
       method: "GET",
       path: `/brands/${brandId}/campaigns/${campaignId}/tiers/`,

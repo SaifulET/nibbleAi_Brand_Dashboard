@@ -42,6 +42,26 @@ const readError = (error: unknown) =>
 
 const applicationDraftKey = "nibbl-brand-application-draft";
 
+const networkRetry = async <T>(request: () => Promise<T>, attempts = 2): Promise<T> => {
+  try {
+    return await request();
+  } catch (error) {
+    if (attempts > 1 && error instanceof TypeError) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return networkRetry(request, attempts - 1);
+    }
+    throw error;
+  }
+};
+
+const optionalRequest = async <T>(request: () => Promise<T>, fallback: T): Promise<T> => {
+  try {
+    return await networkRetry(request);
+  } catch {
+    return fallback;
+  }
+};
+
 const saveApplicationDraft = (body: ApiRecord) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(applicationDraftKey, JSON.stringify(body));
@@ -56,9 +76,17 @@ const submitSavedApplicationDraft = async () => {
   localStorage.removeItem(applicationDraftKey);
 };
 
-const mapProduct = (item: ApiRecord, index: number): Product => ({
+const mapProduct = (item: ApiRecord, index: number, fallbackBrandName = ""): Product => ({
   id: String(item.id ?? index),
   name: String(item.name ?? "Untitled product"),
+  description: typeof item.description === "string" ? item.description : "",
+  brand: String(
+    item.brand_name ??
+      (item.brand && typeof item.brand === "object"
+        ? (item.brand as ApiRecord).name
+        : undefined) ??
+      fallbackBrandName
+  ),
   imageSrc: String(item.image_url ?? item.image ?? "/Auth/rebateImage.svg"),
   category: String(item.category ?? "UNCATEGORIZED").toUpperCase(),
   flavor: String(
@@ -71,6 +99,7 @@ const mapProduct = (item: ApiRecord, index: number): Product => ({
   ).toUpperCase(),
   format: String(item.format ?? item.sku ?? "").toUpperCase(),
   size: String(item.size_volume ?? item.size ?? ""),
+  sku: String(item.sku ?? ""),
   aliases: Array.isArray(item.aliases)
     ? item.aliases.map((alias) =>
         typeof alias === "object" && alias && "alias_text" in alias
@@ -78,6 +107,7 @@ const mapProduct = (item: ApiRecord, index: number): Product => ({
           : String(alias)
       )
     : [],
+  aliasCount: Number(item.alias_count ?? (Array.isArray(item.aliases) ? item.aliases.length : 0)),
   aliasRecords: Array.isArray(item.aliases)
     ? item.aliases
         .filter((alias): alias is ApiRecord => Boolean(alias) && typeof alias === "object")
@@ -98,6 +128,17 @@ const mapNotification = (item: ApiRecord): NotificationItem => ({
   bgClass: "bg-[rgba(0,27,210,0.1)]",
   iconColor: "#001BD2",
 });
+
+const brandNameFromState = (state: {
+  brand: ApiRecord | null;
+  brands: ApiRecord[];
+  selectedBrandId: string | null;
+}) => {
+  const selectedBrand =
+    state.brand ||
+    state.brands.find((brand) => String(brand.id ?? "") === state.selectedBrandId);
+  return String(selectedBrand?.name ?? selectedBrand?.brand_name ?? "");
+};
 
 interface BrandApiState {
   accessToken: string | null;
@@ -138,13 +179,24 @@ interface BrandApiState {
   selectBrand: (brandId: string) => Promise<void>;
   loadProducts: (brandId?: string) => Promise<void>;
   loadProductAliases: (productId: string) => Promise<void>;
-  createProduct: (body: ApiRecord) => Promise<void>;
+  createProduct: (body: ApiRecord | FormData) => Promise<Product>;
+  updateProduct: (productId: string, body: ApiRecord | FormData) => Promise<void>;
   updateProductAliases: (productId: string, aliases: string[]) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
   createCampaign: (body: {
     name: string;
     description?: string;
     productIds: string[];
+    dailyBudget: string | number;
+    startAt?: string;
+    endAt?: string;
+    isActive?: boolean;
+    tiers?: { rewardAmount: string | number; allocationPercent: string | number }[];
+    fallback?: { rewardAmount: string | number; isEnabled: boolean; description?: string };
+  }) => Promise<void>;
+  updateCampaign: (campaignId: string, body: {
+    name: string;
+    description?: string;
     dailyBudget: string | number;
     startAt?: string;
     endAt?: string;
@@ -269,10 +321,13 @@ export const useBrandApiStore = create<BrandApiState>()(
         set({ status: "loading", error: null });
         try {
           const [profile, brandsResponse, applicationsResponse, notificationsResponse] = await Promise.all([
-            nibblApi.me(),
-            apiClient.request<unknown>(backendApi.brand.brands),
-            apiClient.request<unknown>(backendApi.brand.applications),
-            nibblApi.notifications({ unread: true }),
+            networkRetry(() => nibblApi.me()),
+            networkRetry(() => apiClient.request<unknown>(backendApi.brand.brands)),
+            optionalRequest(
+              () => apiClient.request<unknown>(backendApi.brand.applications),
+              []
+            ),
+            optionalRequest(() => nibblApi.notifications({ unread: true }), []),
           ]);
           const brands = listResults(brandsResponse);
           const selectedBrandId = get().selectedBrandId || String(brands[0]?.id ?? "");
@@ -282,9 +337,9 @@ export const useBrandApiStore = create<BrandApiState>()(
             brandApplications: listResults(applicationsResponse),
             selectedBrandId: selectedBrandId || null,
             notifications: listResults(notificationsResponse).map(mapNotification),
-            status: "success",
           });
           if (selectedBrandId) await get().selectBrand(selectedBrandId);
+          set({ status: "success" });
         } catch (error) {
           set({ status: "error", error: readError(error) });
         }
@@ -308,26 +363,28 @@ export const useBrandApiStore = create<BrandApiState>()(
           members,
         ] =
           await Promise.all([
-            apiClient.request<ApiRecord>(backendApi.brand.brandDetail(brandId)),
-            apiClient.request<ApiRecord>(backendApi.brand.wallet(brandId)),
-            apiClient.request<unknown>(backendApi.brand.walletTransactions(brandId)),
-            apiClient.request<unknown>(backendApi.brand.products(brandId)),
-            apiClient.request<unknown>(backendApi.brand.campaigns(brandId)),
-            apiClient.request<unknown>(backendApi.brand.reviewCampaigns(brandId)),
-            apiClient.request<unknown>(backendApi.brand.redemptions(brandId)),
-            apiClient.request<unknown>(backendApi.brand.reviewQueue(brandId)),
-            apiClient.request<unknown>(backendApi.brand.reviews(brandId)),
-            apiClient.request<unknown>(backendApi.brand.customers(brandId)),
-            apiClient.request<ApiRecord>(backendApi.brand.analyticsOverview(brandId)),
-            apiClient.request<unknown>(backendApi.brand.analyticsCampaigns(brandId)),
-            apiClient.request<unknown>(backendApi.brand.analyticsProducts(brandId)),
-            apiClient.request<unknown>(backendApi.brand.members(brandId)),
+            networkRetry(() => apiClient.request<ApiRecord>(backendApi.brand.brandDetail(brandId))),
+            optionalRequest(() => apiClient.request<ApiRecord>(backendApi.brand.wallet(brandId)), {}),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.walletTransactions(brandId)), []),
+            networkRetry(() => apiClient.request<unknown>(backendApi.brand.products(brandId))),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.campaigns(brandId)), []),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.reviewCampaigns(brandId)), []),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.redemptions(brandId)), []),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.reviewQueue(brandId)), []),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.reviews(brandId)), []),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.customers(brandId)), []),
+            optionalRequest(() => apiClient.request<ApiRecord>(backendApi.brand.analyticsOverview(brandId)), {}),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.analyticsCampaigns(brandId)), []),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.analyticsProducts(brandId)), []),
+            optionalRequest(() => apiClient.request<unknown>(backendApi.brand.members(brandId)), []),
           ]);
         set({
           brand,
           wallet,
           walletTransactions: listResults(walletTransactions),
-          products: listResults(products).map(mapProduct),
+          products: listResults(products).map((product, index) =>
+            mapProduct(product, index, String(brand.name ?? brand.brand_name ?? ""))
+          ),
           campaigns: listResults(campaigns),
           reviewCampaigns: listResults(reviewCampaigns),
           redemptions: listResults(redemptions),
@@ -343,7 +400,12 @@ export const useBrandApiStore = create<BrandApiState>()(
       loadProducts: async (brandId = get().selectedBrandId || undefined) => {
         if (!brandId) return;
         const response = await apiClient.request<unknown>(backendApi.brand.products(brandId));
-        set({ products: listResults(response).map(mapProduct) });
+        const brandName = brandNameFromState(get());
+        set({
+          products: listResults(response).map((product, index) =>
+            mapProduct(product, index, brandName)
+          ),
+        });
       },
       loadProductAliases: async (productId) => {
         const brandId = get().selectedBrandId;
@@ -370,7 +432,17 @@ export const useBrandApiStore = create<BrandApiState>()(
       createProduct: async (body) => {
         const brandId = get().selectedBrandId;
         if (!brandId) throw new Error("Select a brand before creating products.");
-        await apiClient.request(backendApi.brand.createProduct(brandId), { body });
+        const response = await apiClient.request<ApiRecord>(
+          backendApi.brand.createProduct(brandId),
+          { body }
+        );
+        await get().loadProducts(brandId);
+        return mapProduct(response, get().products.length, brandNameFromState(get()));
+      },
+      updateProduct: async (productId, body) => {
+        const brandId = get().selectedBrandId;
+        if (!brandId) throw new Error("Select a brand before editing products.");
+        await apiClient.request(backendApi.brand.updateProduct(brandId, productId), { body });
         await get().loadProducts(brandId);
       },
       updateProductAliases: async (productId, aliases) => {
@@ -461,6 +533,63 @@ export const useBrandApiStore = create<BrandApiState>()(
         }
         if (isActive) {
           await apiClient.request(backendApi.brand.activateCampaign(brandId, campaignId));
+        }
+        const campaigns = await apiClient.request<unknown>(
+          backendApi.brand.campaigns(brandId)
+        );
+        set({ campaigns: listResults(campaigns) });
+      },
+      updateCampaign: async (
+        campaignId,
+        {
+          name,
+          description = "",
+          dailyBudget,
+          startAt,
+          endAt,
+          isActive = true,
+          tiers = [],
+          fallback,
+        }
+      ) => {
+        const brandId = get().selectedBrandId;
+        if (!brandId) throw new Error("Select a brand before editing campaigns.");
+        const currentCampaign = get().campaigns.find(
+          (campaign) => String(campaign.id ?? "") === campaignId
+        );
+        const currentStatus = String(currentCampaign?.status ?? "").toLowerCase();
+        await apiClient.request(backendApi.brand.updateCampaign(brandId, campaignId), {
+          body: {
+            name,
+            description,
+            daily_budget: String(dailyBudget),
+            start_at: startAt || null,
+            end_at: endAt || null,
+          },
+        });
+        if (tiers.length) {
+          await apiClient.request(backendApi.brand.setCampaignTiers(brandId, campaignId), {
+            body: {
+              tiers: tiers.map((tier) => ({
+                reward_amount: String(tier.rewardAmount),
+                allocation_percent: String(tier.allocationPercent),
+              })),
+            },
+          });
+        }
+        if (fallback) {
+          await apiClient.request(backendApi.brand.setCampaignFallback(brandId, campaignId), {
+            body: {
+              reward_amount: String(fallback.rewardAmount),
+              is_enabled: fallback.isEnabled,
+              description: fallback.description || "",
+            },
+          });
+        }
+        if (isActive && currentStatus !== "active") {
+          await apiClient.request(backendApi.brand.activateCampaign(brandId, campaignId));
+        } else if (!isActive && currentStatus === "active") {
+          await apiClient.request(backendApi.brand.pauseCampaign(brandId, campaignId));
         }
         const campaigns = await apiClient.request<unknown>(
           backendApi.brand.campaigns(brandId)

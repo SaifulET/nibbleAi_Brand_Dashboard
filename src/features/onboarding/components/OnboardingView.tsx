@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "./layout/Sidebar";
 import Header from "./layout/Header";
@@ -19,19 +19,105 @@ import CustomersView from "./customers/CustomersView";
 import { Product } from "../utils/mockData";
 import { useBrandApiStore } from "@/stores/useBrandApiStore";
 
+type ProductFormValues = {
+  name: string;
+  description: string;
+  brand: string;
+  imageSrc: string;
+  category: string;
+  flavor: string;
+  format: string;
+  size: string;
+  aliases: string[];
+  imageFile?: File | null;
+};
+
+type ProductViewMode = "list" | "details" | "add" | "edit";
+
+const activeTabStorageKey = "nibbl-brand-active-tab";
+const productViewModeStorageKey = "nibbl-brand-product-view-mode";
+const tabs = [
+  "Dashboard",
+  "Product Library",
+  "Rebate",
+  "Reviews",
+  "Redemptions",
+  "Analytics",
+  "Customers",
+  "Wallet",
+  "Settings",
+];
+
+const readStoredTab = () => {
+  if (typeof window === "undefined") return "Dashboard";
+  const value = localStorage.getItem(activeTabStorageKey);
+  return value && tabs.includes(value) ? value : "Dashboard";
+};
+
+const readStoredProductViewMode = (): ProductViewMode => {
+  if (typeof window === "undefined") return "list";
+  const value = localStorage.getItem(productViewModeStorageKey);
+  return value === "add" || value === "edit" || value === "details" || value === "list"
+    ? value
+    : "list";
+};
+
+const productPayload = (product: ProductFormValues) => {
+  const body = {
+    name: product.name,
+    description: product.description,
+    category: product.category,
+    flavor: product.flavor,
+    format: product.format,
+    size_volume: product.size,
+    sku: product.format || product.size || product.name,
+  };
+
+  if (!product.imageFile) return body;
+
+  const form = new FormData();
+  Object.entries(body).forEach(([key, value]) => {
+    form.append(key, value);
+  });
+  form.append("image_url", product.imageFile);
+  return form;
+};
+
+const productIdsForCampaign = (campaign: Record<string, unknown>) => {
+  const rawProducts = campaign.products ?? campaign.product ?? campaign.product_ids;
+  const products = Array.isArray(rawProducts) ? rawProducts : rawProducts ? [rawProducts] : [];
+
+  return new Set(
+    products
+      .map((product) => {
+        if (product && typeof product === "object" && "id" in product) {
+          return String((product as { id: unknown }).id);
+        }
+        return String(product || "");
+      })
+      .filter(Boolean)
+  );
+};
+
+const isActiveCampaign = (campaign: Record<string, unknown>) =>
+  String(campaign.status ?? "").toLowerCase() === "active";
+
 export default function OnboardingView() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("Dashboard");
-  const [viewMode, setViewMode] = useState<"list" | "details" | "add">("list");
+  const [activeTab, setActiveTabState] = useState(readStoredTab);
+  const [viewMode, setViewModeState] = useState<ProductViewMode>(readStoredProductViewMode);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const {
     products: apiProducts,
+    campaigns: rebateCampaigns,
+    reviewCampaigns,
     notifications: apiNotifications,
     loadWorkspace,
     loadProductAliases,
     createProduct,
+    updateProduct,
     deleteProduct,
     updateProductAliases,
     markAllNotificationsRead,
@@ -39,6 +125,8 @@ export default function OnboardingView() {
     accessToken,
     refreshToken,
     selectedBrandId,
+    brands,
+    brand,
     brandApplications,
     profile,
     status,
@@ -53,11 +141,48 @@ export default function OnboardingView() {
     void loadWorkspace();
   }, [accessToken, refreshToken, loadWorkspace, router]);
 
+  const visibleTab = !selectedBrandId && activeTab !== "Settings" ? "Dashboard" : activeTab;
+  const visibleViewMode =
+    selectedProduct || (viewMode !== "details" && viewMode !== "edit") ? viewMode : "list";
+  const workspaceBrandName = String(
+    brand?.name ??
+      brand?.brand_name ??
+      brands.find((item) => String(item.id ?? "") === selectedBrandId)?.name ??
+      brands.find((item) => String(item.id ?? "") === selectedBrandId)?.brand_name ??
+      ""
+  );
+  const productsWithCampaignCounts = useMemo(() => {
+    const activeCampaigns = [...rebateCampaigns, ...reviewCampaigns].filter(isActiveCampaign);
+
+    return apiProducts.map((product) => ({
+      ...product,
+      activeCampaigns: activeCampaigns.filter((campaign) =>
+        productIdsForCampaign(campaign).has(product.id)
+      ).length,
+    }));
+  }, [apiProducts, rebateCampaigns, reviewCampaigns]);
+  const activeCampaignCountForProduct = (productId: string) =>
+    [...rebateCampaigns, ...reviewCampaigns].filter(
+      (campaign) => isActiveCampaign(campaign) && productIdsForCampaign(campaign).has(productId)
+    ).length;
+
   if (!accessToken && !refreshToken) {
     return null;
   }
 
-  const visibleTab = !selectedBrandId && activeTab !== "Settings" ? "Dashboard" : activeTab;
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(activeTabStorageKey, tab);
+    }
+  };
+
+  const setViewMode = (mode: ProductViewMode) => {
+    setViewModeState(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(productViewModeStorageKey, mode);
+    }
+  };
 
   // Callbacks
   const handleAddNew = () => setViewMode("add");
@@ -65,15 +190,34 @@ export default function OnboardingView() {
   const handleViewDetails = async (prod: Product) => {
     await loadProductAliases(prod.id);
     const latest = useBrandApiStore.getState().products.find((item) => item.id === prod.id);
-    setSelectedProduct(latest || prod);
+    const product = latest || prod;
+    setSelectedProduct({
+      ...product,
+      activeCampaigns: activeCampaignCountForProduct(product.id),
+    });
     setViewMode("details");
   };
 
   const handleEditAliases = async (prod: Product) => {
     await loadProductAliases(prod.id);
     const latest = useBrandApiStore.getState().products.find((item) => item.id === prod.id);
-    setSelectedProduct(latest || prod);
+    const product = latest || prod;
+    setSelectedProduct({
+      ...product,
+      activeCampaigns: activeCampaignCountForProduct(product.id),
+    });
     setShowEditModal(true);
+  };
+
+  const handleEditProduct = async (prod: Product) => {
+    await loadProductAliases(prod.id);
+    const latest = useBrandApiStore.getState().products.find((item) => item.id === prod.id);
+    const product = latest || prod;
+    setSelectedProduct({
+      ...product,
+      activeCampaigns: activeCampaignCountForProduct(product.id),
+    });
+    setViewMode("edit");
   };
 
   const handleDeleteProduct = (prodId: string) => {
@@ -82,30 +226,28 @@ export default function OnboardingView() {
     setViewMode("list");
   };
 
-  const handleSaveProduct = async (newProd: {
-    name: string;
-    description: string;
-    brand: string;
-    category: string;
-    flavor: string;
-    format: string;
-    size: string;
-    aliases: string[];
-  }) => {
-    await createProduct({
-      name: newProd.name,
-      description: newProd.description,
-      category: newProd.category,
-      flavor: newProd.flavor,
-      format: newProd.format,
-      size_volume: newProd.size,
-      sku: newProd.format || newProd.size || newProd.name,
-    });
-    const created = useBrandApiStore.getState().products.find((product) => product.name === newProd.name);
-    if (created && newProd.aliases.length) {
+  const handleViewAllProductCampaigns = (type: "REBATE" | "REVIEW") => {
+    setActiveTab(type === "REVIEW" ? "Reviews" : "Rebate");
+    setViewMode("list");
+    setSelectedProduct(null);
+  };
+
+  const handleSaveProduct = async (newProd: ProductFormValues) => {
+    const created = await createProduct(productPayload(newProd));
+    if (newProd.aliases.length) {
       await updateProductAliases(created.id, newProd.aliases);
     }
     setViewMode("list");
+  };
+
+  const handleUpdateProduct = async (updatedProduct: ProductFormValues) => {
+    if (!selectedProduct) return;
+    await updateProduct(selectedProduct.id, productPayload(updatedProduct));
+    await loadProductAliases(selectedProduct.id);
+    await updateProductAliases(selectedProduct.id, updatedProduct.aliases);
+    const latest = useBrandApiStore.getState().products.find((product) => product.id === selectedProduct.id);
+    setSelectedProduct(latest || { ...selectedProduct, ...updatedProduct });
+    setViewMode("details");
   };
 
   const handleSaveAliases = async (updatedAliases: string[]) => {
@@ -138,6 +280,10 @@ export default function OnboardingView() {
             void markAllNotificationsRead();
           }}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onOpenProfile={() => {
+            setActiveTab("Settings");
+            setViewMode("list");
+          }}
         />
 
         <main className="flex-1 p-4 md:p-8 flex flex-col gap-12 w-full">
@@ -178,28 +324,42 @@ export default function OnboardingView() {
 
               {visibleTab === "Customers" && <CustomersView />}
           
-              {visibleTab === "Product Library" && viewMode === "list" && (
+              {visibleTab === "Product Library" && visibleViewMode === "list" && (
                 <ProductLibraryView
-                  products={apiProducts}
+                  products={productsWithCampaignCounts}
                   onViewDetails={handleViewDetails}
-                  onEditAliases={handleEditAliases}
+                  onEditProduct={handleEditProduct}
                   onAddNew={handleAddNew}
+                  isLoading={status === "loading"}
                 />
               )}
 
-              {visibleTab === "Product Library" && viewMode === "details" && selectedProduct && (
+              {visibleTab === "Product Library" && visibleViewMode === "details" && selectedProduct && (
                 <ProductDetailsView
                   product={selectedProduct}
                   onBack={() => setViewMode("list")}
+                  onEditProduct={handleEditProduct}
                   onEditAliases={handleEditAliases}
                   onDelete={handleDeleteProduct}
+                  onViewAllCampaigns={handleViewAllProductCampaigns}
                 />
               )}
 
-              {visibleTab === "Product Library" && viewMode === "add" && (
+              {visibleTab === "Product Library" && visibleViewMode === "add" && (
                 <AddProductView
                   onCancel={() => setViewMode("list")}
                   onSave={handleSaveProduct}
+                  workspaceBrandName={workspaceBrandName}
+                />
+              )}
+
+              {visibleTab === "Product Library" && visibleViewMode === "edit" && selectedProduct && (
+                <AddProductView
+                  mode="edit"
+                  initialProduct={selectedProduct}
+                  onCancel={() => setViewMode("details")}
+                  onSave={handleUpdateProduct}
+                  workspaceBrandName={workspaceBrandName}
                 />
               )}
             </>

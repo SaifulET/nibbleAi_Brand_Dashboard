@@ -5,6 +5,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
 import StrengthBar from "./StrengthBar";
 import CategoryGrid from "./CategoryGrid";
 import { useBrandApiStore } from "@/stores/useBrandApiStore";
@@ -18,6 +19,7 @@ export default function RegisterCard() {
   const [website, setWebsite] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [accepted, setAccepted] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -137,14 +139,25 @@ export default function RegisterCard() {
           {/* Row 6: Password */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-[#454656]">Password</label>
-            <input
-              type="password"
-              placeholder="••••••••••••"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] font-manrope placeholder-slate-400"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                className="w-full h-12 bg-white border border-slate-200 rounded-2xl px-4 pr-12 text-sm focus:outline-none focus:border-[#001BD2] focus:ring-1 focus:ring-[#001BD2] font-manrope placeholder-slate-400"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((current) => !current)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#757688] transition-colors hover:text-[#001BD2] focus:outline-none focus:text-[#001BD2]"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {/* Password Strength */}

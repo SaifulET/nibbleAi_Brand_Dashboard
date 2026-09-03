@@ -10,20 +10,43 @@ interface AddCustomTierModalProps {
     minPurchase: string;
     allocation: number;
   }) => void;
+  initialTier?: {
+    name: string;
+    structure: string;
+    reward: string;
+    maxPayout: string;
+    minPurchase: string;
+    allocation: number;
+  };
+  mode?: "add" | "edit";
 }
 
-export default function AddCustomTierModal({ onClose, onAdd }: AddCustomTierModalProps) {
-  const [tierName, setTierName] = useState("");
-  const [structure, setStructure] = useState("Dollar Off");
-  const [rewardValue, setRewardValue] = useState("");
-  const [maxPayout, setMaxPayout] = useState("");
-  const [minPurchase, setMinPurchase] = useState("");
-  const [allocation, setAllocation] = useState(25);
+const readRewardValue = (reward: string) => {
+  const match = reward.match(/[\d.]+/);
+  return match?.[0] ?? reward;
+};
+
+export default function AddCustomTierModal({
+  onClose,
+  onAdd,
+  initialTier,
+  mode = "add",
+}: AddCustomTierModalProps) {
+  const [tierName, setTierName] = useState(
+    initialTier?.name.replace(/^\d+\s+/, "") ?? ""
+  );
+  const [structure, setStructure] = useState(initialTier?.structure ?? "Dollar Off");
+  const [rewardValue, setRewardValue] = useState(
+    initialTier ? readRewardValue(initialTier.reward) : ""
+  );
+  const [maxPayout, setMaxPayout] = useState(initialTier?.maxPayout ?? "");
+  const [minPurchase, setMinPurchase] = useState(initialTier?.minPurchase ?? "");
+  const [allocation, setAllocation] = useState(initialTier?.allocation ?? 25);
 
   const handleAdd = () => {
     if (!tierName) return;
     onAdd({
-      name: `05 ${tierName}`,
+      name: mode === "edit" && initialTier ? `${initialTier.name.match(/^\d+/)?.[0] ?? ""} ${tierName}`.trim() : `05 ${tierName}`,
       structure,
       reward: structure === "Percent Off" ? `${rewardValue}% off` : structure === "Dollar Off" ? `$${rewardValue} off` : rewardValue || "Free",
       maxPayout: maxPayout || "0",
@@ -38,7 +61,9 @@ export default function AddCustomTierModal({ onClose, onAdd }: AddCustomTierModa
         
         {/* Header */}
         <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100">
-          <h2 className="text-xl font-bold text-[#131B2E] tracking-tight">Add Custom Tier</h2>
+          <h2 className="text-xl font-bold text-[#131B2E] tracking-tight">
+            {mode === "edit" ? "Edit Tier" : "Add Custom Tier"}
+          </h2>
           <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors text-lg cursor-pointer">✕</button>
         </div>
 
@@ -153,7 +178,7 @@ export default function AddCustomTierModal({ onClose, onAdd }: AddCustomTierModa
             disabled={!tierName}
             className={`px-6 h-[46px] bg-[#001BD2] hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/10 ${!tierName ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            Add Tier
+            {mode === "edit" ? "Save Tier" : "Add Tier"}
           </button>
         </div>
 

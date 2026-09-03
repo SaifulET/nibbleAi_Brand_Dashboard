@@ -1,4 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
+"use client";
+
+import { useState } from "react";
+
 interface Product {
   id: string;
   name: string;
@@ -8,30 +12,41 @@ interface Product {
   format: string;
   size: string;
   aliases: string[];
+  aliasCount?: number;
   activeCampaigns: number;
 }
 
 interface ProductCardProps {
   product: Product;
   onViewDetails: (prod: Product) => void | Promise<void>;
-  onEditAliases: (prod: Product) => void | Promise<void>;
+  onEditProduct: (prod: Product) => void | Promise<void>;
 }
 
-export default function ProductCard({ product, onViewDetails, onEditAliases }: ProductCardProps) {
+export default function ProductCard({ product, onViewDetails, onEditProduct }: ProductCardProps) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
   return (
     <div className="bg-white border border-[#C5C5D9]/10 rounded-[20px] p-6 shadow-sm flex flex-col justify-between h-[420px] font-jakarta hover:shadow-md transition-shadow relative group">
       {/* Top image section */}
       <div className="relative w-full h-[180px] bg-slate-50 rounded-xl overflow-hidden mb-4">
+        {!imageLoaded && (
+          <div className="absolute inset-0 bg-slate-100 animate-pulse" />
+        )}
         <img
           src={product.imageSrc}
           alt={product.name}
-          className="w-full h-full object-contain"
+          loading="lazy"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageLoaded(true)}
+          className={`w-full h-full object-contain transition-opacity duration-200 ${
+            imageLoaded ? "opacity-100" : "opacity-0"
+          }`}
         />
         {/* Edit Button overlay */}
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onEditAliases(product);
+            onEditProduct(product);
           }}
           className="absolute right-3 top-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md border border-slate-100 hover:scale-105 active:scale-95 transition-all cursor-pointer z-10"
         >
@@ -68,7 +83,7 @@ export default function ProductCard({ product, onViewDetails, onEditAliases }: P
         {/* Summary Text Details */}
         <div className="flex flex-col gap-1 border-t border-slate-100 pt-3">
           <div className="flex justify-between items-center text-xs font-semibold text-[#454656]">
-            <span>Aliases: {product.aliases.length}</span>
+            <span>Aliases: {product.aliasCount ?? product.aliases.length}</span>
             <span className="text-[#001BD2]">
               Active Campaigns: {product.activeCampaigns}
             </span>

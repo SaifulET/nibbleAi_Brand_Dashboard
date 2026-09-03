@@ -37,18 +37,20 @@ export default function CreateCampaignStep2({ onBack, onContinue, initialSelecte
   return (
     <div className="flex flex-col gap-8 w-full animate-slide-up text-left">
       {/* Stepper indicators header */}
-      <div className="flex justify-between items-center w-full max-w-[800px] mx-auto font-manrope font-semibold border-b border-slate-100 pb-4">
+      <div className="relative grid grid-cols-4 items-start gap-2 w-full max-w-[920px] mx-auto font-manrope font-semibold border-b border-slate-100 py-3">
+        <div className="absolute left-[12.5%] right-[12.5%] top-[31px] h-[2px] bg-[#EAEDFF]"></div>
+        <div className="absolute left-[12.5%] w-[25%] top-[31px] h-[2px] bg-[#001BD2]"></div>
         {[
           { step: "1", title: "Basic Info", done: true },
           { step: "2", title: "Products", active: true },
           { step: "3", title: "Budget & Offers", active: false },
           { step: "4", title: "Review & publish", active: false },
         ].map((s) => (
-          <div key={s.step} className="flex items-center gap-2">
-            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-              s.active ? "bg-[#001BD2] text-white" : s.done ? "bg-[#001BD2]/20 text-[#001BD2]" : "bg-slate-200 text-[#454656]"
+          <div key={s.step} className="relative z-10 flex flex-col items-center gap-2 min-w-0">
+            <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+              s.active ? "bg-[#001BD2] text-white shadow-[0_0_0_8px_#DFE0FF]" : s.done ? "bg-[#DAE2FD] text-[#001BD2]" : "bg-[#DAE2FD] text-[#454656]"
             }`}>{s.done ? "✓" : s.step}</span>
-            <span className={s.active ? "text-[#001BD2] text-xs" : "text-slate-400 text-xs"}>{s.title}</span>
+            <span className={s.active ? "text-[#001BD2] text-xs text-center" : "text-slate-400 text-xs text-center"}>{s.title}</span>
           </div>
         ))}
       </div>

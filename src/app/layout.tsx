@@ -33,10 +33,12 @@ export default function RootLayout({
       className={`${inter.variable} ${jakarta.variable} ${manrope.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-white text-slate-900 font-sans">
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col bg-white text-slate-900 font-sans"
+      >
         {children}
       </body>
     </html>
   );
 }
-
